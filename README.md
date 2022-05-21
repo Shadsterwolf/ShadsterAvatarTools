@@ -4,6 +4,7 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 - Please note this is still under-developed and isn't very "user friendly"
 - Backup at least a prefab of your avatar before using!!! 
 - Use at your own risk!
+- Theres missing feedback but once the button is pressed, the code executes. If the console shows no errors, it probably worked.
 ```
 
 # Instructions
