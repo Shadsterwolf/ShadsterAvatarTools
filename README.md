@@ -1,5 +1,6 @@
 # Shadster's Avatar Tools [Download](https://github.com/Shadsterwolf/ShadsterAvatarTools/releases)
 Shadsterwolf's own avatar tools, mostly used for personal use and subject to change. <br />
+<b>Intended for Unity Editor to support VRChat Avatar models</b>
 ```diff
 - Please note this is still under-developed and isn't very "user friendly"
 - Backup at least a prefab of your avatar, use at your own risk!!!
