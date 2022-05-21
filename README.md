@@ -9,7 +9,7 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 # Features
 - Quick fixes of mesh boundaries and probes
 - Quick setup for Gogo Loco (after import): https://franadavrc.gumroad.com/l/gogoloco
-- Quick export preparation clearing Blueprint ID and Prefab backup
+- Quick export preparation of Prefab backup and clearing Blueprint ID 
 - Quick Physbone setup
 
 # Credits
