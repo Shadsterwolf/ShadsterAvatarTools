@@ -1,4 +1,4 @@
-# Shadster's Avatar Tools
+# Shadster's Avatar Tools [Download](https://github.com/Shadsterwolf/ShadsterAvatarTools/releases)
 Shadsterwolf's own avatar tools, mostly used for personal use and subject to change. <br />
 <b>Please backup at least a prefab of your avatar before using!!!</b>
 
