@@ -88,24 +88,6 @@ namespace Shadster.AvatarTools
             isAvatarLoaded = false;
         }
 
-        private bool LoadAvatar()
-        {
-            if (!vrcAvatarDescriptor)
-            {
-                ResetConfigs(true);
-                return false;
-            }
-
-            if (lastLoadedAvatar == null) lastLoadedAvatar = vrcAvatarDescriptor.gameObject;
-            else if (lastLoadedAvatar != vrcAvatarDescriptor.gameObject)
-            {
-                lastLoadedAvatar = vrcAvatarDescriptor.gameObject;
-                ResetConfigs();
-            }
-
-            return isAvatarLoaded;
-        }
-
         private static List<SkinnedMeshRenderer> GetAvatarSkinnedMeshRenderers(GameObject root, Bounds bounds)
         {
             List<SkinnedMeshRenderer> smrList = null;
@@ -335,19 +317,12 @@ namespace Shadster.AvatarTools
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                using (var checkChanges = new EditorGUI.ChangeCheckScope())
-                {
-                    vrcAvatarDescriptor = (VRCAvatarDescriptor)EditorGUILayout.ObjectField(vrcAvatarDescriptor, typeof(VRCAvatarDescriptor), true, GUILayout.Height(24));
-                    if (checkChanges.changed)
-                        LoadAvatar();
-                }
-
+                vrcAvatarDescriptor = (VRCAvatarDescriptor)EditorGUILayout.ObjectField(vrcAvatarDescriptor, typeof(VRCAvatarDescriptor), true, GUILayout.Height(24));
 
                 if (GUILayout.Button("Auto-Detect", GUILayout.Height(24)))
                 {
                     vrcAvatarDescriptor = SelectCurrentAvatarDescriptor();
                     vrcAvatar = vrcAvatarDescriptor.gameObject;
-                    LoadAvatar();
                     breastBoneL = GetAvatarBone(vrcAvatar, "Breast", "_L");
                     breastBoneR = GetAvatarBone(vrcAvatar, "Breast", "_R");
                     buttBoneL = GetAvatarBone(vrcAvatar, "Butt", "_L");
