@@ -11,7 +11,6 @@ using VRC.SDK3.Avatars.ScriptableObjects;
 using VRC_PhysBone = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone;
 #endif
 
-
 namespace Shadster.AvatarTools
 {
     [System.Serializable]
@@ -20,7 +19,7 @@ namespace Shadster.AvatarTools
         [SerializeField, HideInInspector] static ShadstersAvatarTools _tools;
 
         static EditorWindow _toolsWindow;
-        private bool isAvatarLoaded = false;
+        private bool startInSceneView = false;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
@@ -33,8 +32,6 @@ namespace Shadster.AvatarTools
         [SerializeReference] private Transform earBoneR;
         [SerializeReference] private Transform earBoneL;
         [SerializeReference] private Transform tailBone;
-
-        private GameObject lastLoadedAvatar;
 
         public static ShadstersAvatarTools ToolsWindow
         {
@@ -51,7 +48,7 @@ namespace Shadster.AvatarTools
             }
         }
 
-        [MenuItem("Tools/ShadsterWolf/Show Avatar Tools", false, 0)]
+        [MenuItem("ShadsterWolf/Show Avatar Tools", false, 0)]
         public static void ShowWindow()
         {
             if (!_toolsWindow)
@@ -81,11 +78,6 @@ namespace Shadster.AvatarTools
             }
 
             return vrcAvatarDescriptor;
-        }
-
-        private void ResetConfigs(bool foldoutOptions = false)
-        {
-            isAvatarLoaded = false;
         }
 
         private static List<SkinnedMeshRenderer> GetAvatarSkinnedMeshRenderers(GameObject root, Bounds bounds)
@@ -119,34 +111,34 @@ namespace Shadster.AvatarTools
             return bounds;
         }
 
-        private static void EncapsulateAvatarBounds(GameObject root)
+        private static void EncapsulateAvatarBounds(GameObject vrcAvatar)
         {
-            Undo.RecordObject(root, "Combine Mesh Bounds");
-            Bounds bounds = CalculateLocalBounds(root);
-            foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            Undo.RecordObject(vrcAvatar, "Combine Mesh Bounds");
+            Bounds bounds = CalculateLocalBounds(vrcAvatar);
+            foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 smr.localBounds = bounds;
             }
 
         }
 
-        private static void ResetAvatarBounds(GameObject root)
+        private static void ResetAvatarBounds(GameObject vrcAvatar)
         {
-            foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 smr.sharedMesh.RecalculateBounds();
             }
 
         }
 
-        private static void OverrideAvatarBounds(GameObject root)
+        private static void OverrideAvatarBounds(GameObject vrcAvatar)
         {
             Vector3 vectorSize;
             vectorSize.x = 2.5f;
             vectorSize.y = 2.5f;
             vectorSize.z = 2.5f;
             Bounds bounds = new Bounds(Vector3.zero, vectorSize);
-            foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 smr.localBounds = bounds;
             }
@@ -267,10 +259,10 @@ namespace Shadster.AvatarTools
                 VRC_PhysBone pBone = bone.gameObject.AddComponent<VRC_PhysBone>();
                 pBone.rootTransform = bone;
                 pBone.integrationType = VRC_PhysBone.IntegrationType.Advanced;
-                pBone.pull = 0.3f;
-                pBone.pullCurve = LinearAnimationCurve();
-                pBone.spring = 0.5f;
-                pBone.stiffness = 0.4f;
+                pBone.pull = 0.2f;
+                //pBone.pullCurve = LinearAnimationCurve();
+                pBone.spring = 0.8f;
+                pBone.stiffness = 0.2f;
                 pBone.immobile = 0.3f;
 
                 pBone.limitType = VRC_PhysBone.LimitType.Angle;
@@ -311,6 +303,49 @@ namespace Shadster.AvatarTools
             }
             string savePath = prefabPath + "/" + vrcAvatar.name + ".prefab";
             PrefabUtility.SaveAsPrefabAsset(vrcAvatar, savePath);
+        }
+
+        public static List<Material> GetObjectMaterials(GameObject go)
+        {
+            List<Material> goMaterials = go.GetComponent<Renderer>().materials.ToList();
+            return goMaterials;
+        }
+
+        public static List<Texture> GetObjectTextures(GameObject go)
+        {
+            List<Texture> goTextures = new List<Texture>();
+            Renderer goRender = go.GetComponent<Renderer>();
+            Shader shader = goRender.sharedMaterial.shader;
+            for (int i = 0; i < ShaderUtil.GetPropertyCount(shader); i++)
+            {
+                if (ShaderUtil.GetPropertyType(shader, i) == ShaderUtil.ShaderPropertyType.TexEnv)
+                {
+                    Texture texture = goRender.sharedMaterial.GetTexture(ShaderUtil.GetPropertyName(shader, i));
+                    //Debug.Log(texture.ToString());
+                    goTextures.Add(texture);
+                }
+            }
+            Debug.Log(goTextures);
+            return goTextures;
+
+        }
+
+        private static void UncheckAvatarTextureMipMaps(GameObject vrcAvatar)
+        {
+            List<Texture> aTextures = new List<Texture>();
+            foreach (Renderer render in vrcAvatar.GetComponentsInChildren<Renderer>(true))
+            {
+                Debug.Log(render.gameObject);
+                aTextures.AddRange(GetObjectTextures(render.gameObject));
+            }
+            aTextures = aTextures.Distinct().ToList();
+            TextureImporter importer = new TextureImporter();
+            foreach (Texture tex in aTextures)
+            {
+                Debug.Log(tex.name);
+                importer = AssetDatabase.LoadAssetAtPath<TextureImporter>(tex.name);
+                importer.mipmapEnabled = false;
+            }
         }
 
         public void OnGUI()
@@ -383,6 +418,16 @@ namespace Shadster.AvatarTools
             {
                 SaveAvatarPrefab(vrcAvatar);
             }
+            if (GUILayout.Button("Uncheck Texture Mip Maps", GUILayout.Height(24)))
+            {
+                UncheckAvatarTextureMipMaps(vrcAvatar);
+            }
+            startInSceneView = GUILayout.Toggle(startInSceneView, "Start play mode in Scene view", GUILayout.Height(24));
+            if (startInSceneView)
+            {
+                SceneView.FocusWindowIfItsOpen(typeof(UnityEditor.SceneView));
+            }
+
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
 
             EditorGUILayout.LabelField("Breast Bones");
