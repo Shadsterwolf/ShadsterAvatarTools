@@ -140,6 +140,7 @@ namespace Shadster.AvatarTools
             Bounds bounds = new Bounds(Vector3.zero, vectorSize);
             foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
+                Undo.RecordObject(smr, "Set Avatar Bounds");
                 smr.localBounds = bounds;
             }
         }
@@ -148,6 +149,7 @@ namespace Shadster.AvatarTools
 
             foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
+                Undo.RecordObject(smr, "Set Avatar Anchor Probe");
                 smr.probeAnchor = GetAvatarArmature(vrcAvatar).Find("Hips");
             }
         }
@@ -173,7 +175,7 @@ namespace Shadster.AvatarTools
         {
             vrcAvatarDescriptor.customizeAnimationLayers = true; //ensure customizing playable layers is true
             vrcAvatarDescriptor.autoLocomotion = false; //disable force 6-point tracking
-            
+
             vrcAvatarDescriptor.baseAnimationLayers[0].isDefault = false; //Base
             vrcAvatarDescriptor.baseAnimationLayers[3].isDefault = false; //Action
             vrcAvatarDescriptor.specialAnimationLayers[0].isDefault = false; //Sitting
@@ -193,7 +195,7 @@ namespace Shadster.AvatarTools
             return height;
         }
 
-        
+
 
         private Transform GetAvatarBone(GameObject vrcAvatar, string search, string direction)
         {
@@ -210,7 +212,28 @@ namespace Shadster.AvatarTools
                             result = bone;
                         }
                     }
-                    
+
+
+                }
+            }
+            //Debug.Log(result);
+            return result;
+        }
+
+        public static List<VRC_PhysBone> GetAllAvatarPhysBones(GameObject vrcAvatar)
+        {
+            Transform armature = GetAvatarArmature(vrcAvatar);
+            List<VRC_PhysBone> result = new List<VRC_PhysBone>();
+            if (armature != null)
+            {
+                foreach (Transform bone in armature.GetComponentsInChildren<Transform>(true))
+                {
+                    if (BoneHasPhysBones(bone))
+                    {
+                        VRC_PhysBone pBone = bone.GetComponent<VRC_PhysBone>();
+                        result.Add(pBone);
+                    }
+
 
                 }
             }
@@ -227,6 +250,7 @@ namespace Shadster.AvatarTools
                 {
                     if (bone.name.EndsWith("_end"))
                     {
+                        Undo.RecordObject(bone, "Delete End Bone");
                         DestroyImmediate(bone.gameObject);
                     }
                 }
@@ -305,46 +329,70 @@ namespace Shadster.AvatarTools
             PrefabUtility.SaveAsPrefabAsset(vrcAvatar, savePath);
         }
 
-        public static List<Material> GetObjectMaterials(GameObject go)
+        public static List<Object> GetAvatarTextures(GameObject vrcAvatar)
         {
-            List<Material> goMaterials = go.GetComponent<Renderer>().materials.ToList();
-            return goMaterials;
-        }
-
-        public static List<Texture> GetObjectTextures(GameObject go)
-        {
-            List<Texture> goTextures = new List<Texture>();
-            Renderer goRender = go.GetComponent<Renderer>();
-            Shader shader = goRender.sharedMaterial.shader;
-            for (int i = 0; i < ShaderUtil.GetPropertyCount(shader); i++)
+            List<Object> aTextures = new List<Object>();
+            foreach (Renderer r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
             {
-                if (ShaderUtil.GetPropertyType(shader, i) == ShaderUtil.ShaderPropertyType.TexEnv)
+                foreach (Material m in r.sharedMaterials)
                 {
-                    Texture texture = goRender.sharedMaterial.GetTexture(ShaderUtil.GetPropertyName(shader, i));
-                    //Debug.Log(texture.ToString());
-                    goTextures.Add(texture);
+                    if (!m)
+                        continue;
+                    int[] texIDs = m.GetTexturePropertyNameIDs();
+                    if (texIDs == null)
+                        continue;
+                    foreach (int i in texIDs)
+                    {
+                        Texture t = m.GetTexture(i);
+                        if (!t)
+                            continue;
+                        string path = AssetDatabase.GetAssetPath(t);
+                        if (string.IsNullOrEmpty(path))
+                            continue;
+                        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                        aTextures.Add(importer);
+                    }
                 }
             }
-            Debug.Log(goTextures);
-            return goTextures;
+            return aTextures;
 
         }
 
         private static void UncheckAvatarTextureMipMaps(GameObject vrcAvatar)
         {
-            List<Texture> aTextures = new List<Texture>();
-            foreach (Renderer render in vrcAvatar.GetComponentsInChildren<Renderer>(true))
+            List<string> paths = new List<string>();
+            List<Object> aTextures = GetAvatarTextures(vrcAvatar);
+            if (aTextures.Count > 0)
             {
-                Debug.Log(render.gameObject);
-                aTextures.AddRange(GetObjectTextures(render.gameObject));
+                foreach (Object o in GetAvatarTextures(vrcAvatar))
+                {
+                    TextureImporter t = (TextureImporter)o;
+                    if (t.mipmapEnabled)
+                    {
+                        Undo.RecordObject(t, "Un-Generate Mip Maps");
+                        t.mipmapEnabled = false;
+                        EditorUtility.SetDirty(t);
+                        paths.Add(t.assetPath);
+                    }
+                }
             }
-            aTextures = aTextures.Distinct().ToList();
-            TextureImporter importer = new TextureImporter();
-            foreach (Texture tex in aTextures)
+            if (paths.Count > 0)
             {
-                Debug.Log(tex.name);
-                importer = AssetDatabase.LoadAssetAtPath<TextureImporter>(tex.name);
-                importer.mipmapEnabled = false;
+                AssetDatabase.ForceReserializeAssets(paths);
+                AssetDatabase.Refresh();
+            }
+        }
+
+        private static void SetAllGrabMovement(GameObject vrcAvatar)
+        {
+            List<VRC_PhysBone> pBones = GetAllAvatarPhysBones(vrcAvatar);
+            if (pBones.Count > 0)
+            {
+                foreach (var pBone in pBones)
+                {
+                    Undo.RecordObject(pBone, "Set Avatar PhysBone Grab Movement");
+                    pBone.grabMovement = 1;
+                }
             }
         }
 
@@ -391,14 +439,15 @@ namespace Shadster.AvatarTools
             //{
             //    EncapsulateAvatarBounds(vrcAvatar);
             //}
-            if (GUILayout.Button("Override Mesh Bounds", GUILayout.Height(24)))
+            if (GUILayout.Button("Set All Mesh Bounds to 2.5sq", GUILayout.Height(24)))
             {
                 OverrideAvatarBounds(vrcAvatar);
             }
-            if (GUILayout.Button("Override Anchor Probes", GUILayout.Height(24)))
+            if (GUILayout.Button("Set All Anchor Probes to Hip", GUILayout.Height(24)))
             {
                 OverrideAvatarAnchorProbes(vrcAvatar);
             }
+
             //if (GUILayout.Button("Reset Mesh Bounds", GUILayout.Height(24)))
             //{
             //    ResetAvatarBounds(vrcAvatar);
@@ -418,13 +467,14 @@ namespace Shadster.AvatarTools
             {
                 SaveAvatarPrefab(vrcAvatar);
             }
-            if (GUILayout.Button("Uncheck Texture Mip Maps", GUILayout.Height(24)))
+            if (GUILayout.Button("Uncheck All Texture Mip Maps", GUILayout.Height(24)))
             {
                 UncheckAvatarTextureMipMaps(vrcAvatar);
             }
             startInSceneView = GUILayout.Toggle(startInSceneView, "Start play mode in Scene view", GUILayout.Height(24));
             if (startInSceneView)
             {
+
                 SceneView.FocusWindowIfItsOpen(typeof(UnityEditor.SceneView));
             }
 
@@ -456,6 +506,10 @@ namespace Shadster.AvatarTools
             //    AddButtPhysBones(buttBoneL);
             //    AddButtPhysBones(buttBoneR);
             //}
+            if (GUILayout.Button("Set All Grab Movement to 1", GUILayout.Height(24)))
+            {
+                SetAllGrabMovement(vrcAvatar);
+            }
         }
     }
 }
