@@ -147,10 +147,10 @@ namespace Shadster.AvatarTools
         private static void OverrideAvatarAnchorProbes(GameObject vrcAvatar)
         {
 
-            foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            foreach (Renderer r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
             {
-                Undo.RecordObject(smr, "Set Avatar Anchor Probe");
-                smr.probeAnchor = GetAvatarArmature(vrcAvatar).Find("Hips");
+                Undo.RecordObject(r, "Set Avatar Anchor Probe");
+                r.probeAnchor = GetAvatarArmature(vrcAvatar).Find("Hips");
             }
         }
 
@@ -298,7 +298,17 @@ namespace Shadster.AvatarTools
         {
             if (!BoneHasPhysBones(bone))
             {
+                VRC_PhysBone pBone = bone.gameObject.AddComponent<VRC_PhysBone>();
+                pBone.rootTransform = bone;
+                pBone.integrationType = VRC_PhysBone.IntegrationType.Advanced;
+                pBone.pull = 0.2f;
+                //pBone.pullCurve = LinearAnimationCurve();
+                pBone.spring = 0.8f;
+                pBone.stiffness = 0.2f;
+                pBone.immobile = 0.3f;
 
+                pBone.limitType = VRC_PhysBone.LimitType.Angle;
+                pBone.maxAngleX = 45;
             }
         }
 
