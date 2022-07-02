@@ -20,6 +20,7 @@ namespace Shadster.AvatarTools
 
         static EditorWindow _toolsWindow;
         private bool startInSceneView = false;
+        private bool combineShapekeyNames = false;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
@@ -406,6 +407,125 @@ namespace Shadster.AvatarTools
             }
         }
 
+        private static void UncheckAllWriteDefaults(VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            var baseAnimations = vrcAvatarDescriptor.baseAnimationLayers;
+            var specialAnimations = vrcAvatarDescriptor.specialAnimationLayers;
+            var aControllers = baseAnimations.Concat(specialAnimations);
+            foreach (var aController in aControllers)
+            {
+                if (aController.isDefault == false)
+                {
+                    //Debug.Log(aController.animatorController);
+                    var controller = aController.animatorController as UnityEditor.Animations.AnimatorController;
+                    foreach (var cLayer in controller.layers)
+                    {
+                        //Debug.Log(cLayer.stateMachine);
+                        var cStates = cLayer.stateMachine.states;
+                        //Debug.Log(cLayer.stateMachine.stateMachines);
+                        foreach (var cState in cStates)
+                        {
+                            //Debug.Log(cState.state);
+                            if (cState.state.writeDefaultValues)
+                            {
+                                cState.state.writeDefaultValues = false;
+                                Debug.Log("Unchecked Write Defaults for: " + cState.state);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        private static void SaveAnimation(AnimationClip anim, string savePath)
+        {
+            if (!(AssetDatabase.IsValidFolder(savePath)))
+                Directory.CreateDirectory(savePath);
+            savePath = savePath + "/" + anim.name + ".anim";
+            AssetDatabase.CreateAsset(anim, savePath);
+        }
+
+        private static void GenerateAnimationRenderToggles(GameObject vrcAvatar)
+        {
+            
+            foreach (var r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
+            {
+                //Debug.Log(r.name);
+                AnimationClip aClipOn = new AnimationClip();
+                AnimationClip aClipOff = new AnimationClip();
+                var path = AnimationUtility.CalculateTransformPath(r.transform, vrcAvatar.transform);
+                aClipOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
+                aClipOn.name = r.name + " ON";
+                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
+                aClipOff.name = r.name + " OFF";
+
+                SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
+                SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
+            }
+        }
+
+        private static void GenerateAnimationShapekeys(GameObject vrcAvatar)
+        {
+            foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                Debug.Log(smr.name);
+                for (int i = 0; i < smr.sharedMesh.blendShapeCount; i++)
+                {
+                    //Debug.Log(smr.sharedMesh.GetBlendShapeName(i));
+                    AnimationClip aClipMin = new AnimationClip();
+                    AnimationClip aClipMax = new AnimationClip();
+                    var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
+                    aClipMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 0)));
+                    aClipMin.name = smr.name + "_" + smr.sharedMesh.GetBlendShapeName(i) + " MIN";
+                    aClipMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
+                    aClipMax.name = smr.name + "_" + smr.sharedMesh.GetBlendShapeName(i) + " MAX";
+
+                    SaveAnimation(aClipMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
+                    SaveAnimation(aClipMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
+                }
+            }
+        }
+
+        private static void CombineAnimationShapekeys(GameObject vrcAvatar)
+        {
+            List<string> blendPaths = new List<string>();
+            foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                //Debug.Log(smr.name);
+                for (int i = 0; i < smr.sharedMesh.blendShapeCount; i++)
+                {
+                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform)); //First blend path
+                    foreach (var smr2 in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true)) //check other skinned mesh renders
+                    {
+                        if (smr.name != smr2.name)
+                        {
+                            for (int j = 0; j < smr2.sharedMesh.blendShapeCount; j++) //check those render's shapekeys
+                            {
+                                if (smr.sharedMesh.GetBlendShapeName(i) == smr2.sharedMesh.GetBlendShapeName(j)) //Matching shapes found
+                                {
+                                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr2.transform, vrcAvatar.transform)); 
+                                }
+                            }
+                        }
+                    }
+                    AnimationClip aClipMin = new AnimationClip();
+                    AnimationClip aClipMax = new AnimationClip();
+                    aClipMin.name = smr.sharedMesh.GetBlendShapeName(i) + " MIN";
+                    aClipMax.name = smr.sharedMesh.GetBlendShapeName(i) + " MAX";
+                    foreach (var path in blendPaths)
+                    {
+                        //var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
+                        aClipMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 0)));
+                        aClipMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
+                    }
+                    SaveAnimation(aClipMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
+                    SaveAnimation(aClipMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
+                    blendPaths.Clear();
+                }
+            }
+        }
+
+
+
         public void OnGUI()
         {
             using (new EditorGUILayout.HorizontalScope())
@@ -481,14 +601,17 @@ namespace Shadster.AvatarTools
             {
                 UncheckAvatarTextureMipMaps(vrcAvatar);
             }
+            if (GUILayout.Button("Uncheck All Write Defaults states", GUILayout.Height(24)))
+            {
+                UncheckAllWriteDefaults(vrcAvatarDescriptor);
+            }
             startInSceneView = GUILayout.Toggle(startInSceneView, "Start play mode in Scene view", GUILayout.Height(24));
             if (startInSceneView)
             {
-
                 SceneView.FocusWindowIfItsOpen(typeof(UnityEditor.SceneView));
             }
 
-            GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
+            GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
 
             EditorGUILayout.LabelField("Breast Bones");
             using (var horizontalScope = new EditorGUILayout.HorizontalScope())
@@ -519,6 +642,23 @@ namespace Shadster.AvatarTools
             if (GUILayout.Button("Set All Grab Movement to 1", GUILayout.Height(24)))
             {
                 SetAllGrabMovement(vrcAvatar);
+            }
+
+            GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
+
+            if (GUILayout.Button("Generate Animation Render Toggles", GUILayout.Height(24)))
+            {
+                GenerateAnimationRenderToggles(vrcAvatar);
+            }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Generate Animation Shapekeys", GUILayout.Height(24)))
+                {
+                    //GenerateAnimationShapekeys(vrcAvatar);
+                    CombineAnimationShapekeys(vrcAvatar);
+                }
+
+                //combineShapekeyNames = GUILayout.Toggle(combineShapekeyNames, "Combine Similar", GUILayout.Height(24));
             }
         }
     }
