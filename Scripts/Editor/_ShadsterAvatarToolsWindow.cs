@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 #if VRC_SDK_VRCSDK3 && !UDON
@@ -24,7 +25,12 @@ namespace Shadster.AvatarTools
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
-        [SerializeReference] private string currentPath;
+        [SerializeReference] private AnimationClip clipA;
+        [SerializeReference] private AnimationClip clipB;
+        [SerializeReference] private string layerName;
+        [SerializeReference] private string paramName;
+        [SerializeReference] private int selectedParamType = 0;
+
 
         [SerializeReference] private Transform breastBoneL;
         [SerializeReference] private Transform breastBoneR;
@@ -524,6 +530,163 @@ namespace Shadster.AvatarTools
             }
         }
 
+        public static AnimatorController GetFxController(VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            var runtime = vrcAvatarDescriptor.baseAnimationLayers[4].animatorController;
+            return AssetDatabase.LoadAssetAtPath<AnimatorController>(AssetDatabase.GetAssetPath(runtime));
+        }
+
+        private void CreateToggle(VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            var fx = GetFxController(vrcAvatarDescriptor);
+            CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
+
+            for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
+            {
+                if (fx.layers[i].name.Equals(layerName))
+                {
+                    fx.RemoveLayer(i);
+                    break;
+                }
+            }
+            fx.AddLayer(layerName);
+            var fxLayers = fx.layers;
+            var newLayer = fxLayers[fx.layers.Length - 1];
+            newLayer.defaultWeight = 1f;
+
+            var startState = newLayer.stateMachine.AddState(clipA.name, new Vector3(250, 120));
+            startState.writeDefaultValues = false;
+            startState.motion = clipA;
+
+            var endState = newLayer.stateMachine.AddState(clipB.name, new Vector3(250, 20));
+            endState.writeDefaultValues = false;
+            endState.motion = clipB;
+
+            EditorUtility.SetDirty(startState);
+            EditorUtility.SetDirty(endState);
+
+            startState.AddTransition(new AnimatorStateTransition
+            {
+                destinationState = endState,
+                hasFixedDuration = true,
+                duration = 0f,
+                exitTime = 0f,
+                hasExitTime = false
+            });
+            startState.transitions[0].AddCondition(AnimatorConditionMode.If, 0f, paramName);
+
+            endState.AddTransition(new AnimatorStateTransition
+            {
+                destinationState = startState,
+                hasFixedDuration = true,
+                duration = 0f,
+                exitTime = 0f,
+                hasExitTime = false
+            });
+            endState.transitions[0].AddCondition(AnimatorConditionMode.IfNot, 0f, paramName);
+
+            fx.layers = fxLayers; //fixes save for default weight for some reason
+
+            EditorUtility.SetDirty(fx);
+            AssetDatabase.Refresh();
+            AssetDatabase.SaveAssets();
+        }
+
+        private void CreateBlendTree(VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            var fx = GetFxController(vrcAvatarDescriptor);
+            CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
+
+            for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
+            {
+                if (fx.layers[i].name.Equals(layerName))
+                {
+                    fx.RemoveLayer(i);
+                    break;
+                }
+            }
+            fx.AddLayer(layerName);
+            var fxLayers = fx.layers;
+            var newLayer = fxLayers[fx.layers.Length - 1];
+            newLayer.defaultWeight = 1f;
+
+            var newBlendTreeState = newLayer.stateMachine.AddState("Blend Tree", new Vector3(250, 120));
+            var newBlendTree = new BlendTree();
+            newBlendTree.AddChild(clipA, 0);
+            newBlendTree.AddChild(clipB, 1);
+            newBlendTree.name = "Blend Tree";
+            newBlendTree.blendParameter = paramName;
+            newBlendTree.blendType = BlendTreeType.Simple1D;
+            newBlendTreeState.motion = newBlendTree;
+            newBlendTreeState.writeDefaultValues = false;
+
+            fx.layers = fxLayers; //fixes save for default weight for some reason
+
+            EditorUtility.SetDirty(fx);
+            AssetDatabase.Refresh();
+            AssetDatabase.SaveAssets();
+        }
+
+        public static void CreateParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, int dataType)
+        {
+            if (dataType == 1)
+                CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
+            else if (dataType == 2)
+                CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
+            else
+                CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
+        }
+
+        public static void CreateParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, AnimatorControllerParameterType dataType)
+        {
+            var vrcEx = vrcAvatarDescriptor.expressionParameters;
+            var fx = GetFxController(vrcAvatarDescriptor);
+            VRCExpressionParameters.ValueType vrcExType;
+            switch (dataType)
+            {
+                case AnimatorControllerParameterType.Int:
+                    vrcExType = VRCExpressionParameters.ValueType.Int;
+                    break;
+                case AnimatorControllerParameterType.Float:
+                    vrcExType = VRCExpressionParameters.ValueType.Float;
+                    break;
+                default:
+                    vrcExType = VRCExpressionParameters.ValueType.Bool;
+                    break;
+            }
+
+
+            for (int i = 0; i < fx.parameters.Length; i++)
+            {
+                if (paramName.Equals(fx.parameters[i].name))
+                    fx.RemoveParameter(i); //Remove anyway just in case theres a new datatype
+            }
+            fx.AddParameter(paramName,dataType);
+
+            var vrcExParams = vrcEx.parameters.ToList();
+            for (int i = 0; i < vrcEx.parameters.Length; i++)
+            {
+                if (paramName.Equals(vrcExParams[i].name))
+                {
+                    vrcExParams.Remove(vrcExParams[i]);
+                    break;
+                }
+            }
+            var newVrcExParam = new VRCExpressionParameters.Parameter()
+            {
+                name = paramName,
+                valueType = vrcExType,
+                defaultValue = 0
+            };
+            vrcExParams.Add(newVrcExParam);
+            vrcEx.parameters = vrcExParams.ToArray();
+
+            EditorUtility.SetDirty(fx);
+            EditorUtility.SetDirty(vrcEx);
+            AssetDatabase.Refresh();
+
+        }
+
 
 
         public void OnGUI()
@@ -650,16 +813,49 @@ namespace Shadster.AvatarTools
             {
                 GenerateAnimationRenderToggles(vrcAvatar);
             }
-            using (new EditorGUILayout.HorizontalScope())
+            if (GUILayout.Button("Generate Animation Shapekeys", GUILayout.Height(24)))
             {
-                if (GUILayout.Button("Generate Animation Shapekeys", GUILayout.Height(24)))
-                {
-                    //GenerateAnimationShapekeys(vrcAvatar);
-                    CombineAnimationShapekeys(vrcAvatar);
-                }
-
-                //combineShapekeyNames = GUILayout.Toggle(combineShapekeyNames, "Combine Similar", GUILayout.Height(24));
+                //GenerateAnimationShapekeys(vrcAvatar);
+                CombineAnimationShapekeys(vrcAvatar);
             }
+            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("Main/Start Clip", GUILayout.Height(24));
+                GUILayout.Label("Last/End Clip", GUILayout.Height(24));
+            }
+
+            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+            {
+                clipA = (AnimationClip)EditorGUILayout.ObjectField(clipA, typeof(AnimationClip), true, GUILayout.Height(24));
+                clipB = (AnimationClip)EditorGUILayout.ObjectField(clipB, typeof(AnimationClip), true, GUILayout.Height(24));
+            }
+            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("Layer Name:", GUILayout.Height(24));
+                layerName = EditorGUILayout.DelayedTextField(layerName, GUILayout.Height(24));
+            }
+            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("Param Name:", GUILayout.Height(24));
+                paramName = EditorGUILayout.DelayedTextField(paramName, GUILayout.Height(24));
+            }
+            if (GUILayout.Button("Create/Overwrite Toggle FX Layer (bool)", GUILayout.Height(24)))
+            {
+                CreateToggle(vrcAvatarDescriptor);
+            }
+            if (GUILayout.Button("Create/Overwrite BlendTree FX Layer (float)", GUILayout.Height(24)))
+            {
+                CreateBlendTree(vrcAvatarDescriptor);
+            }
+            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("Create/Overwrite Parameter", GUILayout.Height(24)))
+                {
+                    CreateParameter(vrcAvatarDescriptor, paramName, selectedParamType);
+                }
+                selectedParamType = GUILayout.SelectionGrid(selectedParamType, new string[] { "bool", "int", "float" }, 3, GUILayout.Height(24));
+            }
+
         }
     }
 }
