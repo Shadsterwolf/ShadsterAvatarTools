@@ -13,10 +13,12 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 3. In Unity, open Tools > ShadsterWolf > Show Avatar Tools
 
 # Features
-- Quick fixes of mesh boundaries and probes
+- Quick settings of mesh boundaries and anchor probes
 - Quick setup for Gogo Loco (after import): https://franadavrc.gumroad.com/l/gogoloco
 - Quick export preparation of Prefab backup and clearing Blueprint ID 
 - Quick Physbone setup
+- Quick Generation of Animation Renders and Shapekeys
+- Quick Toggle and BlendTree setup
 
 # Credits
 Inspired by PumkinsAvatarTools and Av3Creator
