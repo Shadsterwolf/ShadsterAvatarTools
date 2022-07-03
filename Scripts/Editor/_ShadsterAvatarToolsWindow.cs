@@ -67,6 +67,21 @@ namespace Shadster.AvatarTools
             _toolsWindow.Show();
         }
 
+        public void ResetAll()
+        {
+            vrcAvatarDescriptor = null;
+            vrcAvatar = null;
+            breastBoneL = null;
+            breastBoneR = null;
+            buttBoneL = null;
+            buttBoneR = null;
+            clipA = null;
+            clipB = null;
+            layerName = "";
+            paramName = "";
+            selectedParamType = 0;
+        }
+
         public static VRCAvatarDescriptor SelectCurrentAvatarDescriptor()
         {
             VRCAvatarDescriptor vrcAvatarDescriptor = null;
@@ -712,12 +727,7 @@ namespace Shadster.AvatarTools
 
                 if (GUILayout.Button("Reset-All", GUILayout.Height(24)))
                 {
-                    vrcAvatarDescriptor = null;
-                    vrcAvatar = null;
-                    breastBoneL = null;
-                    breastBoneR = null;
-                    buttBoneL = null;
-                    buttBoneR = null;
+                    ResetAll();
                 }
 
             }
