@@ -842,12 +842,12 @@ namespace Shadster.AvatarTools
             using (var horizontalScope = new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.Label("Layer Name:", GUILayout.Height(24));
-                layerName = EditorGUILayout.DelayedTextField(layerName, GUILayout.Height(24));
+                layerName = EditorGUILayout.TextField(layerName, GUILayout.Height(24));
             }
             using (var horizontalScope = new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.Label("Param Name:", GUILayout.Height(24));
-                paramName = EditorGUILayout.DelayedTextField(paramName, GUILayout.Height(24));
+                paramName = EditorGUILayout.TextField(paramName, GUILayout.Height(24));
             }
             if (GUILayout.Button("Create/Overwrite Toggle FX Layer (bool)", GUILayout.Height(24)))
             {
