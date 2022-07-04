@@ -20,17 +20,22 @@ namespace Shadster.AvatarTools
         [SerializeField, HideInInspector] static ShadstersAvatarTools _tools;
 
         static EditorWindow _toolsWindow;
-        private bool startInSceneView = false;
+        private bool keepSceneView = false;
         private bool combineShapekeyNames = false;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
+        [SerializeReference] private VRCExpressionParameters vrcParameters;
+        [SerializeReference] private VRCExpressionsMenu vrcMenu;
+
         [SerializeReference] private AnimationClip clipA;
         [SerializeReference] private AnimationClip clipB;
         [SerializeReference] private string layerName;
         [SerializeReference] private string paramName;
         [SerializeReference] private int selectedParamType = 0;
-
+        [SerializeReference] private int selectedControlType = 0;
+        [SerializeReference] private string menuControlName;
+        [SerializeReference] private bool createControlChecked;
 
         [SerializeReference] private Transform breastBoneL;
         [SerializeReference] private Transform breastBoneR;
@@ -80,6 +85,18 @@ namespace Shadster.AvatarTools
             layerName = "";
             paramName = "";
             selectedParamType = 0;
+        }
+
+        public void AutoDetect()
+        {
+            vrcAvatarDescriptor = SelectCurrentAvatarDescriptor();
+            vrcAvatar = vrcAvatarDescriptor.gameObject;
+            vrcParameters = vrcAvatarDescriptor.expressionParameters;
+            vrcMenu = vrcAvatarDescriptor.expressionsMenu;
+            breastBoneL = GetAvatarBone(vrcAvatar, "Breast", "_L");
+            breastBoneR = GetAvatarBone(vrcAvatar, "Breast", "_R");
+            buttBoneL = GetAvatarBone(vrcAvatar, "Butt", "_L");
+            buttBoneR = GetAvatarBone(vrcAvatar, "Butt", "_R");
         }
 
         public static VRCAvatarDescriptor SelectCurrentAvatarDescriptor()
@@ -642,6 +659,73 @@ namespace Shadster.AvatarTools
             AssetDatabase.SaveAssets();
         }
 
+        public void CreateMenuControl(VRCExpressionsMenu menu, string controlName, int controlType, string paramName)
+        {
+            switch (controlType)
+            {
+                case 1:
+                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.Button, paramName);
+                    break;
+                case 2:
+                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.TwoAxisPuppet, paramName);
+                    break;
+                case 3:
+                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.FourAxisPuppet, paramName);
+                    break;
+                case 4:
+                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.RadialPuppet, paramName);
+                    break;
+                default:
+                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.Toggle, paramName);
+                    break;
+            }
+        }
+        private void CreateMenuControl(VRCAvatarDescriptor vrcAvatarDescriptor, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
+        {
+            //var param = vrcAvatarDescriptor.expressionParameters;
+            var menu = vrcAvatarDescriptor.expressionsMenu;
+            CreateMenuControl(menu, controlName, controlType, paramName);
+        }
+
+        private void CreateMenuControl(VRCExpressionsMenu menu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
+        {
+            foreach (var control in menu.controls)
+            {
+                if (control.name.Equals(controlName))
+                {
+                    menu.controls.Remove(control); 
+                    break;
+                }
+            }
+            if (menu.controls.Count == 8)
+            {
+                EditorUtility.DisplayDialog("Menu control full!", "Free up controls or make a new one", "Ok");
+                return;
+            }
+            var item = new VRCExpressionsMenu.Control {
+                name = controlName,
+                type = controlType,
+            };
+            if (controlType == VRCExpressionsMenu.Control.ControlType.RadialPuppet)
+            {
+                item.subParameters = new VRCExpressionsMenu.Control.Parameter[]
+                { new  VRCExpressionsMenu.Control.Parameter {
+                    name = paramName
+                }};
+            }
+            else
+            {
+                item.parameter = new VRCExpressionsMenu.Control.Parameter
+                {
+                    name = paramName
+                };
+            }
+
+            menu.controls.Add(item);
+            EditorUtility.SetDirty(menu);
+
+        }
+
         public static void CreateParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, int dataType)
         {
             if (dataType == 1)
@@ -712,12 +796,7 @@ namespace Shadster.AvatarTools
 
                 if (GUILayout.Button("Auto-Detect", GUILayout.Height(24)))
                 {
-                    vrcAvatarDescriptor = SelectCurrentAvatarDescriptor();
-                    vrcAvatar = vrcAvatarDescriptor.gameObject;
-                    breastBoneL = GetAvatarBone(vrcAvatar, "Breast", "_L");
-                    breastBoneR = GetAvatarBone(vrcAvatar, "Breast", "_R");
-                    buttBoneL = GetAvatarBone(vrcAvatar, "Butt", "_L");
-                    buttBoneR = GetAvatarBone(vrcAvatar, "Butt", "_R");
+                    AutoDetect();
                 }
             }
             using (new EditorGUILayout.HorizontalScope())
@@ -778,8 +857,8 @@ namespace Shadster.AvatarTools
             {
                 UncheckAllWriteDefaults(vrcAvatarDescriptor);
             }
-            startInSceneView = GUILayout.Toggle(startInSceneView, "Start play mode in Scene view", GUILayout.Height(24));
-            if (startInSceneView)
+            keepSceneView = GUILayout.Toggle(keepSceneView, "Keep play mode in Scene view", GUILayout.Height(24));
+            if (keepSceneView)
             {
                 SceneView.FocusWindowIfItsOpen(typeof(UnityEditor.SceneView));
             }
@@ -833,7 +912,6 @@ namespace Shadster.AvatarTools
                 GUILayout.Label("Main/Start Clip", GUILayout.Height(24));
                 GUILayout.Label("Last/End Clip", GUILayout.Height(24));
             }
-
             using (var horizontalScope = new EditorGUILayout.HorizontalScope())
             {
                 clipA = (AnimationClip)EditorGUILayout.ObjectField(clipA, typeof(AnimationClip), true, GUILayout.Height(24));
@@ -849,6 +927,7 @@ namespace Shadster.AvatarTools
                 GUILayout.Label("Param Name:", GUILayout.Height(24));
                 paramName = EditorGUILayout.TextField(paramName, GUILayout.Height(24));
             }
+            //vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
             if (GUILayout.Button("Create/Overwrite Toggle FX Layer (bool)", GUILayout.Height(24)))
             {
                 CreateToggle(vrcAvatarDescriptor);
@@ -857,6 +936,7 @@ namespace Shadster.AvatarTools
             {
                 CreateBlendTree(vrcAvatarDescriptor);
             }
+            
             using (var horizontalScope = new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Create/Overwrite Parameter", GUILayout.Height(24)))
@@ -865,7 +945,17 @@ namespace Shadster.AvatarTools
                 }
                 selectedParamType = GUILayout.SelectionGrid(selectedParamType, new string[] { "bool", "int", "float" }, 3, GUILayout.Height(24));
             }
-
+            vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
+            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("Menu Control Name:", GUILayout.Height(24));
+                menuControlName = EditorGUILayout.TextField(menuControlName, GUILayout.Height(24));
+                selectedControlType = GUILayout.SelectionGrid(selectedControlType, new string[] { "Toggle", "Button", "Two AP", "Four AP", "Radial" }, 5, GUILayout.Height(24));
+            }
+            if (GUILayout.Button("Create/Overwrite Menu Control", GUILayout.Height(24)))
+            {
+                CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
+            }
         }
     }
 }
