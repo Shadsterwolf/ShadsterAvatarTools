@@ -19,9 +19,10 @@ namespace Shadster.AvatarTools
     {
         [SerializeField, HideInInspector] static ShadstersAvatarTools _tools;
 
-        static EditorWindow _toolsWindow;
-        private bool keepSceneView = false;
-        private bool combineShapekeyNames = false;
+        static EditorWindow toolWindow;
+        private bool startInSceneView = false;
+        private GameObject startInSceneViewPrefab;
+        private bool useExperimentalPlayMode;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
@@ -60,16 +61,26 @@ namespace Shadster.AvatarTools
             }
         }
 
+        private void OnEnable()
+        {
+            Application.runInBackground = true;
+            useExperimentalPlayMode = EditorSettings.enterPlayModeOptionsEnabled;
+            startInSceneViewPrefab = GameObject.Find("StartInSceneView(Clone)"); //Find if existing prefab is already in Hierarchy
+            if (startInSceneViewPrefab != null)
+                startInSceneView = true;
+        }
+
         [MenuItem("ShadsterWolf/Show Avatar Tools", false, 0)]
         public static void ShowWindow()
         {
-            if (!_toolsWindow)
+            if (!toolWindow)
             {
-                _toolsWindow = EditorWindow.GetWindow(typeof(_ShadstersAvatarToolsWindow));
-                _toolsWindow.autoRepaintOnSceneChange = true;
-                _toolsWindow.titleContent = new GUIContent("ShadsterTools");
+                toolWindow = EditorWindow.GetWindow(typeof(_ShadstersAvatarToolsWindow));
+                toolWindow.autoRepaintOnSceneChange = true;
+                toolWindow.titleContent = new GUIContent("ShadsterTools");
+                toolWindow.minSize = new Vector2(500, 800);
             }
-            _toolsWindow.Show();
+            toolWindow.Show();
         }
 
         public void ResetAll()
@@ -97,6 +108,35 @@ namespace Shadster.AvatarTools
             breastBoneR = GetAvatarBone(vrcAvatar, "Breast", "_R");
             buttBoneL = GetAvatarBone(vrcAvatar, "Butt", "_L");
             buttBoneR = GetAvatarBone(vrcAvatar, "Butt", "_R");
+        }
+
+        private static void UseExperimentalPlayMode(bool value)
+        {
+            const string EditorSettingsAssetPath = "ProjectSettings/EditorSettings.asset";
+            SerializedObject editorSettings = new SerializedObject(UnityEditor.AssetDatabase.LoadAllAssetsAtPath(EditorSettingsAssetPath)[0]);
+            SerializedProperty m_playMode = editorSettings.FindProperty("m_EnterPlayModeOptionsEnabled");
+            SerializedProperty m_playModeOptions = editorSettings.FindProperty("m_EnterPlayModeOptions");
+            if (value)
+            {
+                m_playMode.boolValue = true;
+                m_playModeOptions.intValue = 1; //0 = all checked, 1 = scene only, 2 = domain only, 3 = none?
+            }
+            else
+            {
+                m_playMode.boolValue = false;
+                m_playModeOptions.intValue = 3;
+            }
+            editorSettings.ApplyModifiedProperties();
+        }
+
+        private void StartPlayModeInSceneView(bool value)
+        {
+            var prefabPath = AssetDatabase.GUIDToAssetPath("38bc44479eca0c9409fb9a16a3a9a873");
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (value)
+                startInSceneViewPrefab = Instantiate(prefab);
+            else
+                DestroyImmediate(startInSceneViewPrefab, true);
         }
 
         public static VRCAvatarDescriptor SelectCurrentAvatarDescriptor()
@@ -413,13 +453,38 @@ namespace Shadster.AvatarTools
             List<Object> aTextures = GetAvatarTextures(vrcAvatar);
             if (aTextures.Count > 0)
             {
-                foreach (Object o in GetAvatarTextures(vrcAvatar))
+                foreach (Object o in aTextures)
                 {
                     TextureImporter t = (TextureImporter)o;
                     if (t.mipmapEnabled)
                     {
                         Undo.RecordObject(t, "Un-Generate Mip Maps");
                         t.mipmapEnabled = false;
+                        EditorUtility.SetDirty(t);
+                        paths.Add(t.assetPath);
+                    }
+                }
+            }
+            if (paths.Count > 0)
+            {
+                AssetDatabase.ForceReserializeAssets(paths);
+                AssetDatabase.Refresh();
+            }
+        }
+
+        private static void SetAvatarTexturesMaxSize(GameObject vrcAvatar, int maxSize)
+        {
+            List<string> paths = new List<string>();
+            List<Object> aTextures = GetAvatarTextures(vrcAvatar);
+            if (aTextures.Count > 0)
+            {
+                foreach (Object o in aTextures)
+                {
+                    TextureImporter t = (TextureImporter)o;
+                    if (t.maxTextureSize != maxSize)
+                    {
+                        Undo.RecordObject(t, "Set Textures size to 4k");
+                        t.maxTextureSize = maxSize;
                         EditorUtility.SetDirty(t);
                         paths.Add(t.assetPath);
                     }
@@ -484,21 +549,29 @@ namespace Shadster.AvatarTools
 
         private static void GenerateAnimationRenderToggles(GameObject vrcAvatar)
         {
-            
+            AnimationClip allOff = new AnimationClip();
+            AnimationClip allOn = new AnimationClip();
+            allOff.name = "all OFF";
+            allOn.name = "all ON";
             foreach (var r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
             {
                 //Debug.Log(r.name);
-                AnimationClip aClipOn = new AnimationClip();
                 AnimationClip aClipOff = new AnimationClip();
-                var path = AnimationUtility.CalculateTransformPath(r.transform, vrcAvatar.transform);
-                aClipOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
-                aClipOn.name = r.name + " ON";
-                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
+                AnimationClip aClipOn = new AnimationClip();
                 aClipOff.name = r.name + " OFF";
-
+                aClipOn.name = r.name + " ON";
+                var path = AnimationUtility.CalculateTransformPath(r.transform, vrcAvatar.transform);
+                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));         
+                aClipOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
+                allOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
+                allOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
+                
                 SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
                 SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
             }
+            SaveAnimation(allOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
+            SaveAnimation(allOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
+
         }
 
         private static void GenerateAnimationShapekeys(GameObject vrcAvatar)
@@ -526,6 +599,10 @@ namespace Shadster.AvatarTools
         private static void CombineAnimationShapekeys(GameObject vrcAvatar)
         {
             List<string> blendPaths = new List<string>();
+            AnimationClip allMin = new AnimationClip();
+            AnimationClip allMax = new AnimationClip();
+            allMin.name = "all MIN";
+            allMax.name = "all MAX";
             foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 //Debug.Log(smr.name);
@@ -553,13 +630,17 @@ namespace Shadster.AvatarTools
                     {
                         //var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
                         aClipMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 0)));
+                        allMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 0)));
                         aClipMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
+                        allMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
                     }
                     SaveAnimation(aClipMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
                     SaveAnimation(aClipMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
                     blendPaths.Clear();
                 }
             }
+            SaveAnimation(allMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
+            SaveAnimation(allMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
         }
 
         public static AnimatorController GetFxController(VRCAvatarDescriptor vrcAvatarDescriptor)
@@ -810,151 +891,177 @@ namespace Shadster.AvatarTools
                 }
 
             }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var sceneToggleState = GUILayout.Toggle(startInSceneView, new GUIContent("Start Play Mode in Scene View", "Loads prefab that will start play mode to Scene view instead of starting in Game View"), GUILayout.Height(24));
+                if (sceneToggleState != startInSceneView)
+                {
+                    StartPlayModeInSceneView(sceneToggleState);
+                    startInSceneView = sceneToggleState;
+                }
+                var playModeToggleState = GUILayout.Toggle(useExperimentalPlayMode, new GUIContent("Use Experimental Play Mode", "Instantly loads entering play mode, which appears to disable some automatic project asset saving, be sure to save often"), GUILayout.Height(24));
+                if (playModeToggleState != useExperimentalPlayMode)
+                { 
+                    UseExperimentalPlayMode(playModeToggleState);
+                    useExperimentalPlayMode = playModeToggleState;
 
+                }
+            }
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
 
-            if (GUILayout.Button("Delete End Bones", GUILayout.Height(24)))
+            using (new EditorGUI.DisabledScope(vrcAvatarDescriptor == null))
             {
-                DeleteEndBones(vrcAvatar);
-            }
-            //if (GUILayout.Button("Combine Mesh Bounds", GUILayout.Height(24)))
-            //{
-            //    EncapsulateAvatarBounds(vrcAvatar);
-            //}
-            if (GUILayout.Button("Set All Mesh Bounds to 2.5sq", GUILayout.Height(24)))
-            {
-                OverrideAvatarBounds(vrcAvatar);
-            }
-            if (GUILayout.Button("Set All Anchor Probes to Hip", GUILayout.Height(24)))
-            {
-                OverrideAvatarAnchorProbes(vrcAvatar);
-            }
-
-            //if (GUILayout.Button("Reset Mesh Bounds", GUILayout.Height(24)))
-            //{
-            //    ResetAvatarBounds(vrcAvatar);
-            //}
-            if (GUILayout.Button("Install Gogo Loco", GUILayout.Height(24)))
-            {
-                if (GogoLocoExist())
+                if (GUILayout.Button("Delete End Bones", GUILayout.Height(24)))
                 {
-                    PrepGogoLoco(vrcAvatarDescriptor);
+                    DeleteEndBones(vrcAvatar);
                 }
-            }
-            if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
-            {
-                ClearAvatarBlueprintID(vrcAvatar);
-            }
-            if (GUILayout.Button("Save Avatar Prefab", GUILayout.Height(24)))
-            {
-                SaveAvatarPrefab(vrcAvatar);
-            }
-            if (GUILayout.Button("Uncheck All Texture Mip Maps", GUILayout.Height(24)))
-            {
-                UncheckAvatarTextureMipMaps(vrcAvatar);
-            }
-            if (GUILayout.Button("Uncheck All Write Defaults states", GUILayout.Height(24)))
-            {
-                UncheckAllWriteDefaults(vrcAvatarDescriptor);
-            }
-            keepSceneView = GUILayout.Toggle(keepSceneView, "Keep play mode in Scene view", GUILayout.Height(24));
-            if (keepSceneView)
-            {
-                SceneView.FocusWindowIfItsOpen(typeof(UnityEditor.SceneView));
-            }
+                //if (GUILayout.Button("Combine Mesh Bounds", GUILayout.Height(24)))
+                //{
+                //    EncapsulateAvatarBounds(vrcAvatar);
+                //}
 
-            GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
-
-            EditorGUILayout.LabelField("Breast Bones");
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                breastBoneL = (Transform)EditorGUILayout.ObjectField(breastBoneL, typeof(Transform), true, GUILayout.Height(24));
-                breastBoneR = (Transform)EditorGUILayout.ObjectField(breastBoneR, typeof(Transform), true, GUILayout.Height(24));
-            }
-            EditorGUILayout.LabelField("Butt Bones");
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                buttBoneL = (Transform)EditorGUILayout.ObjectField(buttBoneL, typeof(Transform), true, GUILayout.Height(24));
-                buttBoneR = (Transform)EditorGUILayout.ObjectField(buttBoneR, typeof(Transform), true, GUILayout.Height(24));
-            }
-            if (GUILayout.Button("Auto Add PhysBones", GUILayout.Height(24)))
-            {
-                AddPhysBones(breastBoneL);
-                AddPhysBones(breastBoneR);
-                AddButtPhysBones(buttBoneL);
-                AddButtPhysBones(buttBoneR);
-            }
-            //if (GUILayout.Button("Update PhysBones", GUILayout.Height(24)))
-            //{
-            //    AddPhysBones(breastBoneL);
-            //    AddPhysBones(breastBoneR);
-            //    AddButtPhysBones(buttBoneL);
-            //    AddButtPhysBones(buttBoneR);
-            //}
-            if (GUILayout.Button("Set All Grab Movement to 1", GUILayout.Height(24)))
-            {
-                SetAllGrabMovement(vrcAvatar);
-            }
-
-            GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
-
-            if (GUILayout.Button("Generate Animation Render Toggles", GUILayout.Height(24)))
-            {
-                GenerateAnimationRenderToggles(vrcAvatar);
-            }
-            if (GUILayout.Button("Generate Animation Shapekeys", GUILayout.Height(24)))
-            {
-                //GenerateAnimationShapekeys(vrcAvatar);
-                CombineAnimationShapekeys(vrcAvatar);
-            }
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.Label("Main/Start Clip", GUILayout.Height(24));
-                GUILayout.Label("Last/End Clip", GUILayout.Height(24));
-            }
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                clipA = (AnimationClip)EditorGUILayout.ObjectField(clipA, typeof(AnimationClip), true, GUILayout.Height(24));
-                clipB = (AnimationClip)EditorGUILayout.ObjectField(clipB, typeof(AnimationClip), true, GUILayout.Height(24));
-            }
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.Label("Layer Name:", GUILayout.Height(24));
-                layerName = EditorGUILayout.TextField(layerName, GUILayout.Height(24));
-            }
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.Label("Param Name:", GUILayout.Height(24));
-                paramName = EditorGUILayout.TextField(paramName, GUILayout.Height(24));
-            }
-            //vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
-            if (GUILayout.Button("Create/Overwrite Toggle FX Layer (bool)", GUILayout.Height(24)))
-            {
-                CreateToggle(vrcAvatarDescriptor);
-            }
-            if (GUILayout.Button("Create/Overwrite BlendTree FX Layer (float)", GUILayout.Height(24)))
-            {
-                CreateBlendTree(vrcAvatarDescriptor);
-            }
-            
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                if (GUILayout.Button("Create/Overwrite Parameter", GUILayout.Height(24)))
+                if (GUILayout.Button("Set All Mesh Bounds to 2.5sq", GUILayout.Height(24)))
                 {
-                    CreateParameter(vrcAvatarDescriptor, paramName, selectedParamType);
+                    OverrideAvatarBounds(vrcAvatar);
                 }
-                selectedParamType = GUILayout.SelectionGrid(selectedParamType, new string[] { "bool", "int", "float" }, 3, GUILayout.Height(24));
-            }
-            vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
-            using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.Label("Menu Control Name:", GUILayout.Height(24));
-                menuControlName = EditorGUILayout.TextField(menuControlName, GUILayout.Height(24));
-                selectedControlType = GUILayout.SelectionGrid(selectedControlType, new string[] { "Toggle", "Button", "Two AP", "Four AP", "Radial" }, 5, GUILayout.Height(24));
-            }
-            if (GUILayout.Button("Create/Overwrite Menu Control", GUILayout.Height(24)))
-            {
-                CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
+                if (GUILayout.Button("Set All Anchor Probes to Hip", GUILayout.Height(24)))
+                {
+                    OverrideAvatarAnchorProbes(vrcAvatar);
+                }
+
+                //if (GUILayout.Button("Reset Mesh Bounds", GUILayout.Height(24)))
+                //{
+                //    ResetAvatarBounds(vrcAvatar);
+                //}
+                if (GUILayout.Button("Install Gogo Loco", GUILayout.Height(24)))
+                {
+                    if (GogoLocoExist())
+                    {
+                        PrepGogoLoco(vrcAvatarDescriptor);
+                    }
+                }
+                if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
+                {
+                    ClearAvatarBlueprintID(vrcAvatar);
+                }
+                if (GUILayout.Button("Save Avatar Prefab", GUILayout.Height(24)))
+                {
+                    SaveAvatarPrefab(vrcAvatar);
+                }
+                if (GUILayout.Button("Uncheck All Texture Mip Maps", GUILayout.Height(24)))
+                {
+                    UncheckAvatarTextureMipMaps(vrcAvatar);
+                }
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Set Textures Max Size 2k", GUILayout.Height(24)))
+                    {
+                        SetAvatarTexturesMaxSize(vrcAvatar, 2048);
+                    }
+                    if (GUILayout.Button("Set Textures Max Size 4k", GUILayout.Height(24)))
+                    {
+                        SetAvatarTexturesMaxSize(vrcAvatar, 4096);
+                    }
+                }
+                if (GUILayout.Button("Uncheck All Write Defaults states", GUILayout.Height(24)))
+                {
+                    UncheckAllWriteDefaults(vrcAvatarDescriptor);
+                }
+                
+
+                GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
+
+                EditorGUILayout.LabelField("Breast Bones");
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    breastBoneL = (Transform)EditorGUILayout.ObjectField(breastBoneL, typeof(Transform), true, GUILayout.Height(24));
+                    breastBoneR = (Transform)EditorGUILayout.ObjectField(breastBoneR, typeof(Transform), true, GUILayout.Height(24));
+                }
+                EditorGUILayout.LabelField("Butt Bones");
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    buttBoneL = (Transform)EditorGUILayout.ObjectField(buttBoneL, typeof(Transform), true, GUILayout.Height(24));
+                    buttBoneR = (Transform)EditorGUILayout.ObjectField(buttBoneR, typeof(Transform), true, GUILayout.Height(24));
+                }
+                if (GUILayout.Button("Auto Add PhysBones", GUILayout.Height(24)))
+                {
+                    AddPhysBones(breastBoneL);
+                    AddPhysBones(breastBoneR);
+                    AddButtPhysBones(buttBoneL);
+                    AddButtPhysBones(buttBoneR);
+                }
+                //if (GUILayout.Button("Update PhysBones", GUILayout.Height(24)))
+                //{
+                //    AddPhysBones(breastBoneL);
+                //    AddPhysBones(breastBoneR);
+                //    AddButtPhysBones(buttBoneL);
+                //    AddButtPhysBones(buttBoneR);
+                //}
+                if (GUILayout.Button("Set All Grab Movement to 1", GUILayout.Height(24)))
+                {
+                    SetAllGrabMovement(vrcAvatar);
+                }
+
+                GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
+
+                if (GUILayout.Button("Generate Animation Render Toggles", GUILayout.Height(24)))
+                {
+                    GenerateAnimationRenderToggles(vrcAvatar);
+                }
+                if (GUILayout.Button("Generate Animation Shapekeys", GUILayout.Height(24)))
+                {
+                    //GenerateAnimationShapekeys(vrcAvatar);
+                    CombineAnimationShapekeys(vrcAvatar);
+                }
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("Main/Start Clip", GUILayout.Height(24));
+                    GUILayout.Label("Last/End Clip", GUILayout.Height(24));
+                }
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    clipA = (AnimationClip)EditorGUILayout.ObjectField(clipA, typeof(AnimationClip), true, GUILayout.Height(24));
+                    clipB = (AnimationClip)EditorGUILayout.ObjectField(clipB, typeof(AnimationClip), true, GUILayout.Height(24));
+                }
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("Layer Name:", GUILayout.Height(24));
+                    layerName = EditorGUILayout.TextField(layerName, GUILayout.Height(24));
+                }
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("Param Name:", GUILayout.Height(24));
+                    paramName = EditorGUILayout.TextField(paramName, GUILayout.Height(24));
+                }
+                //vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
+                if (GUILayout.Button("Create/Overwrite Toggle FX Layer (bool)", GUILayout.Height(24)))
+                {
+                    CreateToggle(vrcAvatarDescriptor);
+                }
+                if (GUILayout.Button("Create/Overwrite BlendTree FX Layer (float)", GUILayout.Height(24)))
+                {
+                    CreateBlendTree(vrcAvatarDescriptor);
+                }
+
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Create/Overwrite Parameter", GUILayout.Height(24)))
+                    {
+                        CreateParameter(vrcAvatarDescriptor, paramName, selectedParamType);
+                    }
+                    selectedParamType = GUILayout.SelectionGrid(selectedParamType, new string[] { "bool", "int", "float" }, 3, GUILayout.Height(24));
+                }
+                vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("Menu Control Name:", GUILayout.Height(24));
+                    menuControlName = EditorGUILayout.TextField(menuControlName, GUILayout.Height(24));
+                    selectedControlType = GUILayout.SelectionGrid(selectedControlType, new string[] { "Toggle", "Button", "Two AP", "Four AP", "Radial" }, 5, GUILayout.Height(24));
+                }
+                if (GUILayout.Button("Create/Overwrite Menu Control", GUILayout.Height(24)))
+                {
+                    CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
+                }
             }
         }
     }
