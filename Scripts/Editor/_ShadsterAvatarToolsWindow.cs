@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿#if UNITY_EDITOR
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -28,6 +29,7 @@ namespace Shadster.AvatarTools
         [SerializeReference] private GameObject vrcAvatar;
         [SerializeReference] private VRCExpressionParameters vrcParameters;
         [SerializeReference] private VRCExpressionsMenu vrcMenu;
+
 
         [SerializeReference] private AnimationClip clipA;
         [SerializeReference] private AnimationClip clipB;
@@ -63,12 +65,18 @@ namespace Shadster.AvatarTools
 
         private void OnEnable()
         {
-            Application.runInBackground = true;
+            if (EditorApplication.isPlaying) return;
             useExperimentalPlayMode = EditorSettings.enterPlayModeOptionsEnabled;
             startInSceneViewPrefab = GameObject.Find("StartInSceneView(Clone)"); //Find if existing prefab is already in Hierarchy
             if (startInSceneViewPrefab != null)
                 startInSceneView = true;
         }
+
+        private void OnInspectorUpdate()
+        {
+            if (vrcAvatar != null && vrcAvatarDescriptor == null) //because play mode likes to **** with me and clear the descriptor
+                vrcAvatarDescriptor = vrcAvatar.GetComponent<VRCAvatarDescriptor>();
+        }        
 
         [MenuItem("ShadsterWolf/Show Avatar Tools", false, 0)]
         public static void ShowWindow()
@@ -110,6 +118,11 @@ namespace Shadster.AvatarTools
             buttBoneR = GetAvatarBone(vrcAvatar, "Butt", "_R");
         }
 
+        private  bool VerifyAvatarLoaded()
+        {
+            return vrcAvatarDescriptor != null;
+        }
+
         private static void UseExperimentalPlayMode(bool value)
         {
             const string EditorSettingsAssetPath = "ProjectSettings/EditorSettings.asset";
@@ -141,22 +154,22 @@ namespace Shadster.AvatarTools
 
         public static VRCAvatarDescriptor SelectCurrentAvatarDescriptor()
         {
-            VRCAvatarDescriptor vrcAvatarDescriptor = null;
+            VRCAvatarDescriptor avatarDescriptor = null;
             //Get current selected avatar
             if (Selection.activeTransform && Selection.activeTransform.root.gameObject.GetComponent<VRCAvatarDescriptor>() != null)
             {
-                vrcAvatarDescriptor = Selection.activeTransform.root.GetComponent<VRCAvatarDescriptor>();
-                if (vrcAvatarDescriptor != null)
-                    return vrcAvatarDescriptor;
+                avatarDescriptor = Selection.activeTransform.root.GetComponent<VRCAvatarDescriptor>();
+                if (avatarDescriptor != null)
+                    return avatarDescriptor;
             }
             //Find first potential avatar
             var potentialObjects = Object.FindObjectsOfType<VRCAvatarDescriptor>().ToArray();
             if (potentialObjects.Length > 0)
             {
-                vrcAvatarDescriptor = potentialObjects.First();
+                avatarDescriptor = potentialObjects.First();
             }
 
-            return vrcAvatarDescriptor;
+            return avatarDescriptor;
         }
 
         private static List<SkinnedMeshRenderer> GetAvatarSkinnedMeshRenderers(GameObject root, Bounds bounds)
@@ -867,8 +880,6 @@ namespace Shadster.AvatarTools
 
         }
 
-
-
         public void OnGUI()
         {
             using (new EditorGUILayout.HorizontalScope())
@@ -1066,3 +1077,4 @@ namespace Shadster.AvatarTools
         }
     }
 }
+#endif
