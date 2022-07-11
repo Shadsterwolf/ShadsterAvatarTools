@@ -1,5 +1,4 @@
-﻿#if UNITY_EDITOR
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -910,7 +909,7 @@ namespace Shadster.AvatarTools
                     StartPlayModeInSceneView(sceneToggleState);
                     startInSceneView = sceneToggleState;
                 }
-                var playModeToggleState = GUILayout.Toggle(useExperimentalPlayMode, new GUIContent("Use Experimental Play Mode", "Instantly loads entering play mode, which appears to disable some automatic project asset saving, be sure to save often"), GUILayout.Height(24));
+                var playModeToggleState = GUILayout.Toggle(useExperimentalPlayMode, new GUIContent("Use Experimental Play Mode", "Instantly loads entering play mode, save often and disable if issues occur"), GUILayout.Height(24));
                 if (playModeToggleState != useExperimentalPlayMode)
                 { 
                     UseExperimentalPlayMode(playModeToggleState);
@@ -1077,4 +1076,3 @@ namespace Shadster.AvatarTools
         }
     }
 }
-#endif
