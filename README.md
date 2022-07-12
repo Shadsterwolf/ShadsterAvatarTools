@@ -13,6 +13,7 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 3. In Unity, open Tools > ShadsterWolf > Show Avatar Tools
 
 # Features
+- Quick Sceneview and Playmode speed up toggles
 - Quick settings of mesh boundaries and anchor probes
 - Quick setup for Gogo Loco (after import): https://franadavrc.gumroad.com/l/gogoloco
 - Quick export preparation of Prefab backup and clearing Blueprint ID 
