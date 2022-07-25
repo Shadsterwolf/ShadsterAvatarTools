@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿//Made by Shadsterwolf, some code reverse engineered by the VRCSDK, Av3Creator, and PumpkinTools
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -18,6 +19,7 @@ namespace Shadster.AvatarTools
     public class _ShadstersAvatarToolsWindow : EditorWindow
     {
         [SerializeField, HideInInspector] static ShadstersAvatarTools _tools;
+        //private string version = "0.4.4";
 
         static EditorWindow toolWindow;
         private bool startInSceneView = false;
@@ -433,6 +435,7 @@ namespace Shadster.AvatarTools
         public static List<Object> GetAvatarTextures(GameObject vrcAvatar)
         {
             List<Object> aTextures = new List<Object>();
+            List<string> extensions = new List<string>(new string[] { ".bmp", ".exr", ".gif", ".hdr", ".iff", ".jpg", ".pict", ".png", ".psd", ".tga", ".tiff" });
             foreach (Renderer r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
             {
                 foreach (Material m in r.sharedMaterials)
@@ -448,15 +451,21 @@ namespace Shadster.AvatarTools
                         if (!t)
                             continue;
                         string path = AssetDatabase.GetAssetPath(t);
-                        if (string.IsNullOrEmpty(path))
-                            continue;
-                        TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-                        aTextures.Add(importer);
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            if (extensions.Any(s => path.Contains(s))) //check if actual texture file
+                            {
+                                //Debug.Log(path);
+                                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                                aTextures.Add(importer);
+                            }
+                        }
+
                     }
                 }
             }
+            aTextures = aTextures.Distinct().ToList(); //Clear duplicates
             return aTextures;
-
         }
 
         private static void UncheckAvatarTextureMipMaps(GameObject vrcAvatar)
@@ -490,8 +499,10 @@ namespace Shadster.AvatarTools
             List<Object> aTextures = GetAvatarTextures(vrcAvatar);
             if (aTextures.Count > 0)
             {
+                Debug.Log(aTextures.Count);
                 foreach (Object o in aTextures)
                 {
+                    Debug.Log(o);
                     TextureImporter t = (TextureImporter)o;
                     if (t.maxTextureSize != maxSize)
                     {
@@ -1072,7 +1083,15 @@ namespace Shadster.AvatarTools
                 {
                     CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
                 }
-            }
-        }
-    }
-}
+                
+
+            } // Using Disable Scope
+            //EditorGUILayout.LabelField("<i> Version " + version + " </i>", new GUIStyle(GUI.skin.label)
+            //{
+            //    richText = true,
+            //    alignment = TextAnchor.MiddleRight
+            //});
+
+        } // GUI
+    } // Class
+} // Namespace

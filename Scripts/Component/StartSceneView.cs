@@ -1,10 +1,10 @@
-﻿using UnityEngine;
+﻿//Made by ShadsterWolf
+using UnityEngine;
 using UnityEditor;
 using System.Collections;
 
 public class StartSceneView : MonoBehaviour
 {
-    // Start is called before the first frame update
 #if UNITY_EDITOR
     void Start()
     {
