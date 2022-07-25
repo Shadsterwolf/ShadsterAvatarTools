@@ -10,9 +10,10 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 # Instructions
 1. Import latest VRCSDK (if you havent already done so)
 2. Import my provided released package
-3. In Unity, open Tools > ShadsterWolf > Show Avatar Tools
+3. In Unity, on your toolbar, click "ShadsterWolf" > Show Avatar Tools
 
 # Features
+- Quick Sceneview and Playmode speed up toggles
 - Quick settings of mesh boundaries and anchor probes
 - Quick setup for Gogo Loco (after import): https://franadavrc.gumroad.com/l/gogoloco
 - Quick export preparation of Prefab backup and clearing Blueprint ID 
