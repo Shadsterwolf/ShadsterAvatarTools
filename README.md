@@ -22,4 +22,5 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 - Quick Toggle and BlendTree setup
 
 # Credits
-Inspired by PumkinsAvatarTools and Av3Creator
+Made by ShadsterWolf
+Some code reverse engineered from VRCSDK, PumkinsAvatarTools, and Av3Creator
