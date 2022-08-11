@@ -23,4 +23,5 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 
 # Credits
 Made by ShadsterWolf
+
 Some code inspired by the VRCSDK, PumkinsAvatarTools, and Av3Creator
