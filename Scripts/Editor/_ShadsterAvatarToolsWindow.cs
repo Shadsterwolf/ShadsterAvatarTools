@@ -1,4 +1,4 @@
-﻿//Made by Shadsterwolf, some code reverse engineered by the VRCSDK, Av3Creator, and PumpkinTools
+﻿//Made by Shadsterwolf, some code inspired by the VRCSDK, Av3Creator, and PumpkinTools
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,7 +19,6 @@ namespace Shadster.AvatarTools
     public class _ShadstersAvatarToolsWindow : EditorWindow
     {
         [SerializeField, HideInInspector] static ShadstersAvatarTools _tools;
-        //private string version = "0.4.4";
 
         static EditorWindow toolWindow;
         private bool startInSceneView = false;
@@ -96,6 +95,9 @@ namespace Shadster.AvatarTools
         {
             vrcAvatarDescriptor = null;
             vrcAvatar = null;
+            vrcMenu = null;
+            vrcParameters = null;
+
             breastBoneL = null;
             breastBoneR = null;
             buttBoneL = null;
@@ -111,8 +113,9 @@ namespace Shadster.AvatarTools
         {
             vrcAvatarDescriptor = SelectCurrentAvatarDescriptor();
             vrcAvatar = vrcAvatarDescriptor.gameObject;
-            vrcParameters = vrcAvatarDescriptor.expressionParameters;
             vrcMenu = vrcAvatarDescriptor.expressionsMenu;
+            vrcParameters = vrcAvatarDescriptor.expressionParameters;
+            
             breastBoneL = GetAvatarBone(vrcAvatar, "Breast", "_L");
             breastBoneR = GetAvatarBone(vrcAvatar, "Breast", "_R");
             buttBoneL = GetAvatarBone(vrcAvatar, "Butt", "_L");
@@ -257,14 +260,14 @@ namespace Shadster.AvatarTools
 
         public static bool GogoLocoExist()
         {
-            if (!(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID("Assets/GoGo Loco/Go All/Go All Controller/Go All Base 1.5.controller"))))
+            if (!(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID("Assets/GoGo/Loco/GoControllers/GoLocoBase.controller"))))
             {
                 return true;
             }
             return false;
         }
 
-        private static void PrepGogoLoco(VRCAvatarDescriptor vrcAvatarDescriptor)
+        private static void SetupGogoLocoLayers(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
             vrcAvatarDescriptor.customizeAnimationLayers = true; //ensure customizing playable layers is true
             vrcAvatarDescriptor.autoLocomotion = false; //disable force 6-point tracking
@@ -273,10 +276,26 @@ namespace Shadster.AvatarTools
             vrcAvatarDescriptor.baseAnimationLayers[3].isDefault = false; //Action
             vrcAvatarDescriptor.specialAnimationLayers[0].isDefault = false; //Sitting
 
-            vrcAvatarDescriptor.baseAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo Loco/Go All/Go All Controller/Go All Base 1.5.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.baseAnimationLayers[3].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo Loco/Go All/Go All Controller/Go All Action.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.specialAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo Loco/Go All/Go All Controller/Go All Sitting.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoBase.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[3].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoAction.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.specialAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoSitting.controller", typeof(RuntimeAnimatorController));
             //Debug.Log(AssetDatabase.GetAssetPath(vrcAvatarDescriptor.specialAnimationLayers[0].animatorController));
+        }
+
+        private static void SetupGogoLocoMenu(VRCExpressionsMenu vrcMenu)
+        {
+            var subMenu = (VRCExpressionsMenu)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoMenus/GoAllMainMenu.asset", typeof(VRCExpressionsMenu));
+            var icon = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/Icons/icon_Go_Loco.png", typeof(Texture2D));
+            CreateMenuControl(vrcMenu, "GoGo Loco Menu", VRCExpressionsMenu.Control.ControlType.SubMenu, "", subMenu, icon);
+        }
+
+        private static void SetupGogoLocoParams(VRCExpressionParameters vrcParameters)
+        {
+            CreateVrcParameter(vrcParameters, "VRCEmote", VRCExpressionParameters.ValueType.Int, 0, false);
+            CreateVrcParameter(vrcParameters, "Go/Float", VRCExpressionParameters.ValueType.Float, 0.25f, false);
+            CreateVrcParameter(vrcParameters, "Go/Stationary", VRCExpressionParameters.ValueType.Bool, 0, false);
+            CreateVrcParameter(vrcParameters, "Go/Locomotion", VRCExpressionParameters.ValueType.Bool, 0, true);
+            CreateVrcParameter(vrcParameters, "Go/JumpAndFall", VRCExpressionParameters.ValueType.Bool, 0, true);
         }
 
         public float GetAvatarHeight(GameObject vrcAvatar)
@@ -675,7 +694,7 @@ namespace Shadster.AvatarTools
         private void CreateToggle(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
             var fx = GetFxController(vrcAvatarDescriptor);
-            CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
+            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
 
             for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
             {
@@ -731,7 +750,7 @@ namespace Shadster.AvatarTools
         private void CreateBlendTree(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
             var fx = GetFxController(vrcAvatarDescriptor);
-            CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
+            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
 
             for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
             {
@@ -763,6 +782,15 @@ namespace Shadster.AvatarTools
             AssetDatabase.SaveAssets();
         }
 
+        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
+        {
+            CreateMenuControl(vrcMenu, controlName, controlType, paramName, null, null);
+        }
+        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, Texture2D icon)
+        {
+            CreateMenuControl(vrcMenu, controlName, controlType, paramName, null, icon);
+        }
+
         public void CreateMenuControl(VRCExpressionsMenu menu, string controlName, int controlType, string paramName)
         {
             switch (controlType)
@@ -784,24 +812,26 @@ namespace Shadster.AvatarTools
                     break;
             }
         }
-        private void CreateMenuControl(VRCAvatarDescriptor vrcAvatarDescriptor, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
+        private static void CreateMenuControl(VRCAvatarDescriptor vrcAvatarDescriptor, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
         {
             //var param = vrcAvatarDescriptor.expressionParameters;
-            var menu = vrcAvatarDescriptor.expressionsMenu;
-            CreateMenuControl(menu, controlName, controlType, paramName);
+            var vrcMenu = vrcAvatarDescriptor.expressionsMenu;
+            CreateMenuControl(vrcMenu, controlName, controlType, paramName);
         }
 
-        private void CreateMenuControl(VRCExpressionsMenu menu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
+        
+
+        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, VRCExpressionsMenu subMenu, Texture2D icon)
         {
-            foreach (var control in menu.controls)
+            foreach (var control in vrcMenu.controls)
             {
                 if (control.name.Equals(controlName))
                 {
-                    menu.controls.Remove(control); 
+                    vrcMenu.controls.Remove(control); 
                     break;
                 }
             }
-            if (menu.controls.Count == 8)
+            if (vrcMenu.controls.Count == 8)
             {
                 EditorUtility.DisplayDialog("Menu control full!", "Free up controls or make a new one", "Ok");
                 return;
@@ -817,6 +847,10 @@ namespace Shadster.AvatarTools
                     name = paramName
                 }};
             }
+            else if (controlType == VRCExpressionsMenu.Control.ControlType.SubMenu)
+            {
+                item.subMenu = subMenu;
+            }
             else
             {
                 item.parameter = new VRCExpressionsMenu.Control.Parameter
@@ -824,50 +858,28 @@ namespace Shadster.AvatarTools
                     name = paramName
                 };
             }
-
-            menu.controls.Add(item);
-            EditorUtility.SetDirty(menu);
-
-        }
-
-        public static void CreateParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, int dataType)
-        {
-            if (dataType == 1)
-                CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
-            else if (dataType == 2)
-                CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
-            else
-                CreateParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
-        }
-
-        public static void CreateParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, AnimatorControllerParameterType dataType)
-        {
-            var vrcEx = vrcAvatarDescriptor.expressionParameters;
-            var fx = GetFxController(vrcAvatarDescriptor);
-            VRCExpressionParameters.ValueType vrcExType;
-            switch (dataType)
+            if (icon != null)
             {
-                case AnimatorControllerParameterType.Int:
-                    vrcExType = VRCExpressionParameters.ValueType.Int;
-                    break;
-                case AnimatorControllerParameterType.Float:
-                    vrcExType = VRCExpressionParameters.ValueType.Float;
-                    break;
-                default:
-                    vrcExType = VRCExpressionParameters.ValueType.Bool;
-                    break;
+                item.icon = icon;
             }
 
+            vrcMenu.controls.Add(item);
+            EditorUtility.SetDirty(vrcMenu);
+            AssetDatabase.Refresh();
+            AssetDatabase.SaveAssets();
+        }
 
-            for (int i = 0; i < fx.parameters.Length; i++)
-            {
-                if (paramName.Equals(fx.parameters[i].name))
-                    fx.RemoveParameter(i); //Remove anyway just in case theres a new datatype
-            }
-            fx.AddParameter(paramName,dataType);
+        public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType)
+        {
+            CreateVrcParameter(vrcParameters, paramName, vrcExType, 0, true); //minimum defaults
+        }
 
-            var vrcExParams = vrcEx.parameters.ToList();
-            for (int i = 0; i < vrcEx.parameters.Length; i++)
+        public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType, float defaultValue, bool saved)
+        {
+            
+
+            var vrcExParams = vrcParameters.parameters.ToList();
+            for (int i = 0; i < vrcParameters.parameters.Length; i++)
             {
                 if (paramName.Equals(vrcExParams[i].name))
                 {
@@ -879,15 +891,61 @@ namespace Shadster.AvatarTools
             {
                 name = paramName,
                 valueType = vrcExType,
-                defaultValue = 0
+                defaultValue = defaultValue,
+                saved = saved
             };
             vrcExParams.Add(newVrcExParam);
-            vrcEx.parameters = vrcExParams.ToArray();
+            vrcParameters.parameters = vrcExParams.ToArray();
 
-            EditorUtility.SetDirty(fx);
-            EditorUtility.SetDirty(vrcEx);
+            EditorUtility.SetDirty(vrcParameters);
             AssetDatabase.Refresh();
 
+        }
+
+        public static VRCExpressionParameters.ValueType ConvertAnimatorToVrcParamType(AnimatorControllerParameterType dataType)
+        {
+            VRCExpressionParameters.ValueType vrcParamType;
+            switch (dataType)
+            {
+                case AnimatorControllerParameterType.Int:
+                    vrcParamType = VRCExpressionParameters.ValueType.Int;
+                    break;
+                case AnimatorControllerParameterType.Float:
+                    vrcParamType = VRCExpressionParameters.ValueType.Float;
+                    break;
+                default:
+                    vrcParamType = VRCExpressionParameters.ValueType.Bool;
+                    break;
+            }
+            return vrcParamType;
+        }
+
+        public static void CreateFxParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, int dataType)
+        {
+            if (dataType == 1)
+                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
+            else if (dataType == 2)
+                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
+            else
+                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
+        }
+
+        public static void CreateFxParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, AnimatorControllerParameterType dataType)
+        {
+            var fx = GetFxController(vrcAvatarDescriptor);
+            VRCExpressionParameters.ValueType vrcParamType = ConvertAnimatorToVrcParamType(dataType);
+
+            for (int i = 0; i < fx.parameters.Length; i++)
+            {
+                if (paramName.Equals(fx.parameters[i].name))
+                    fx.RemoveParameter(i); //Remove anyway just in case theres a new datatype
+            }
+            fx.AddParameter(paramName,dataType);
+
+            CreateVrcParameter(vrcAvatarDescriptor.expressionParameters, paramName, vrcParamType);
+
+            EditorUtility.SetDirty(fx);
+            AssetDatabase.Refresh();
         }
 
         public void OnGUI()
@@ -914,6 +972,12 @@ namespace Shadster.AvatarTools
             }
             using (new EditorGUILayout.HorizontalScope())
             {
+                vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
+                vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
                 var sceneToggleState = GUILayout.Toggle(startInSceneView, new GUIContent("Start Play Mode in Scene View", "Loads prefab that will start play mode to Scene view instead of starting in Game View"), GUILayout.Height(24));
                 if (sceneToggleState != startInSceneView)
                 {
@@ -928,10 +992,29 @@ namespace Shadster.AvatarTools
 
                 }
             }
+            
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
-
             using (new EditorGUI.DisabledScope(vrcAvatarDescriptor == null))
             {
+                using (new EditorGUI.DisabledScope(!GogoLocoExist()))
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Setup Gogo Layers", GUILayout.Height(24)))
+                    {
+                        SetupGogoLocoLayers(vrcAvatarDescriptor);
+                    }
+                    if (GUILayout.Button("Add Gogo Menu", GUILayout.Height(24)))
+                    {
+                        SetupGogoLocoMenu(vrcMenu);
+                    }
+                    if (GUILayout.Button("Add Gogo Params", GUILayout.Height(24)))
+                    {
+                        SetupGogoLocoParams(vrcParameters);
+                    }
+
+                }
+
+                GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
                 if (GUILayout.Button("Delete End Bones", GUILayout.Height(24)))
                 {
                     DeleteEndBones(vrcAvatar);
@@ -954,13 +1037,7 @@ namespace Shadster.AvatarTools
                 //{
                 //    ResetAvatarBounds(vrcAvatar);
                 //}
-                if (GUILayout.Button("Install Gogo Loco", GUILayout.Height(24)))
-                {
-                    if (GogoLocoExist())
-                    {
-                        PrepGogoLoco(vrcAvatarDescriptor);
-                    }
-                }
+                
                 if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
                 {
                     ClearAvatarBlueprintID(vrcAvatar);
@@ -1068,11 +1145,10 @@ namespace Shadster.AvatarTools
                 {
                     if (GUILayout.Button("Create/Overwrite Parameter", GUILayout.Height(24)))
                     {
-                        CreateParameter(vrcAvatarDescriptor, paramName, selectedParamType);
+                        CreateFxParameter(vrcAvatarDescriptor, paramName, selectedParamType);
                     }
                     selectedParamType = GUILayout.SelectionGrid(selectedParamType, new string[] { "bool", "int", "float" }, 3, GUILayout.Height(24));
                 }
-                vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
                 using (var horizontalScope = new EditorGUILayout.HorizontalScope())
                 {
                     GUILayout.Label("Menu Control Name:", GUILayout.Height(24));
