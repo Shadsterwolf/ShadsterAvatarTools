@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -11,6 +12,7 @@ using VRC.Core;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Avatars.ScriptableObjects;
 using VRC_PhysBone = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone;
+using VRC_PhysCollider = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneCollider;
 #endif
 
 namespace Shadster.AvatarTools
@@ -21,8 +23,7 @@ namespace Shadster.AvatarTools
         [SerializeField, HideInInspector] static ShadstersAvatarTools _tools;
 
         static EditorWindow toolWindow;
-        private bool startInSceneView = false;
-        private GameObject startInSceneViewPrefab;
+        private bool startInSceneView;
         private bool useExperimentalPlayMode;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
@@ -67,16 +68,14 @@ namespace Shadster.AvatarTools
         {
             if (EditorApplication.isPlaying) return;
             useExperimentalPlayMode = EditorSettings.enterPlayModeOptionsEnabled;
-            startInSceneViewPrefab = GameObject.Find("StartInSceneView(Clone)"); //Find if existing prefab is already in Hierarchy
-            if (startInSceneViewPrefab != null)
-                startInSceneView = true;
+            startInSceneView = ShadstersAvatarTools.GetStartPlayModeInSceneView();
         }
 
         private void OnInspectorUpdate()
         {
             if (vrcAvatar != null && vrcAvatarDescriptor == null) //because play mode likes to **** with me and clear the descriptor
                 vrcAvatarDescriptor = vrcAvatar.GetComponent<VRCAvatarDescriptor>();
-        }        
+        }
 
         [MenuItem("ShadsterWolf/Show Avatar Tools", false, 0)]
         public static void ShowWindow()
@@ -115,16 +114,11 @@ namespace Shadster.AvatarTools
             vrcAvatar = vrcAvatarDescriptor.gameObject;
             vrcMenu = vrcAvatarDescriptor.expressionsMenu;
             vrcParameters = vrcAvatarDescriptor.expressionParameters;
-            
+
             breastBoneL = GetAvatarBone(vrcAvatar, "Breast", "_L");
             breastBoneR = GetAvatarBone(vrcAvatar, "Breast", "_R");
             buttBoneL = GetAvatarBone(vrcAvatar, "Butt", "_L");
             buttBoneR = GetAvatarBone(vrcAvatar, "Butt", "_R");
-        }
-
-        private  bool VerifyAvatarLoaded()
-        {
-            return vrcAvatarDescriptor != null;
         }
 
         private static void UseExperimentalPlayMode(bool value)
@@ -144,16 +138,6 @@ namespace Shadster.AvatarTools
                 m_playModeOptions.intValue = 3;
             }
             editorSettings.ApplyModifiedProperties();
-        }
-
-        private void StartPlayModeInSceneView(bool value)
-        {
-            var prefabPath = AssetDatabase.GUIDToAssetPath("38bc44479eca0c9409fb9a16a3a9a873");
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-            if (value)
-                startInSceneViewPrefab = Instantiate(prefab);
-            else
-                DestroyImmediate(startInSceneViewPrefab, true);
         }
 
         public static VRCAvatarDescriptor SelectCurrentAvatarDescriptor()
@@ -340,7 +324,7 @@ namespace Shadster.AvatarTools
             {
                 foreach (Transform bone in armature.GetComponentsInChildren<Transform>(true))
                 {
-                    if (BoneHasPhysBones(bone))
+                    if (ShadstersAvatarTools.BoneHasPhysBones(bone))
                     {
                         VRC_PhysBone pBone = bone.GetComponent<VRC_PhysBone>();
                         result.Add(pBone);
@@ -369,15 +353,7 @@ namespace Shadster.AvatarTools
             }
         }
 
-        public static bool BoneHasPhysBones(Transform bone)
-        {
-            //Debug.Log(bone);
-            if (bone.GetComponent<VRC_PhysBone>() != null)
-            {
-                return true;
-            }
-            return false;
-        }
+
 
         public static AnimationCurve LinearAnimationCurve()
         {
@@ -390,7 +366,7 @@ namespace Shadster.AvatarTools
 
         private static void AddPhysBones(Transform bone)
         {
-            if (!BoneHasPhysBones(bone))
+            if (!ShadstersAvatarTools.BoneHasPhysBones(bone))
             {
                 VRC_PhysBone pBone = bone.gameObject.AddComponent<VRC_PhysBone>();
                 pBone.rootTransform = bone;
@@ -408,7 +384,7 @@ namespace Shadster.AvatarTools
 
         private static void AddButtPhysBones(Transform bone)
         {
-            if (!BoneHasPhysBones(bone))
+            if (!ShadstersAvatarTools.BoneHasPhysBones(bone))
             {
                 VRC_PhysBone pBone = bone.gameObject.AddComponent<VRC_PhysBone>();
                 pBone.rootTransform = bone;
@@ -434,11 +410,7 @@ namespace Shadster.AvatarTools
 
         }
 
-        private static void ClearAvatarBlueprintID(GameObject vrcAvatar)
-        {
-            PipelineManager blueprint = vrcAvatar.GetComponent<PipelineManager>();
-            blueprint.blueprintId = null;
-        }
+
 
         private static void SaveAvatarPrefab(GameObject vrcAvatar)
         {
@@ -603,11 +575,11 @@ namespace Shadster.AvatarTools
                 aClipOff.name = r.name + " OFF";
                 aClipOn.name = r.name + " ON";
                 var path = AnimationUtility.CalculateTransformPath(r.transform, vrcAvatar.transform);
-                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));         
+                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
                 aClipOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
                 allOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
                 allOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
-                
+
                 SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
                 SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
             }
@@ -659,7 +631,7 @@ namespace Shadster.AvatarTools
                             {
                                 if (smr.sharedMesh.GetBlendShapeName(i) == smr2.sharedMesh.GetBlendShapeName(j)) //Matching shapes found
                                 {
-                                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr2.transform, vrcAvatar.transform)); 
+                                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr2.transform, vrcAvatar.transform));
                                 }
                             }
                         }
@@ -687,7 +659,7 @@ namespace Shadster.AvatarTools
 
         private static void CombineEmoteShapekeys(GameObject vrcAvatar)
         {
-            
+
             List<int> blendIndex = new List<int>();
             foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
@@ -777,7 +749,7 @@ namespace Shadster.AvatarTools
                     });
                     emoteState.transitions[0].AddCondition(AnimatorConditionMode.NotEqual, i + 1, paramName);
 
-                    CreateMenuControl(menu, emote.name, VRCExpressionsMenu.Control.ControlType.Toggle, paramName, i+1);
+                    CreateMenuControl(menu, emote.name, VRCExpressionsMenu.Control.ControlType.Toggle, paramName, i + 1);
                 }
                 fx.layers = fxLayers; //fixes save for default weight for some reason
 
@@ -934,7 +906,7 @@ namespace Shadster.AvatarTools
             CreateMenuControl(vrcMenu, controlName, controlType, paramName);
         }
 
-        
+
 
         private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, VRCExpressionsMenu subMenu, Texture2D icon, int value)
         {
@@ -942,7 +914,7 @@ namespace Shadster.AvatarTools
             {
                 if (control.name.Equals(controlName))
                 {
-                    vrcMenu.controls.Remove(control); 
+                    vrcMenu.controls.Remove(control);
                     break;
                 }
             }
@@ -951,7 +923,8 @@ namespace Shadster.AvatarTools
                 EditorUtility.DisplayDialog("Menu control full!", "Free up controls or make a new one", "Ok");
                 return;
             }
-            var item = new VRCExpressionsMenu.Control {
+            var item = new VRCExpressionsMenu.Control
+            {
                 name = controlName,
                 type = controlType,
                 value = value
@@ -1004,7 +977,7 @@ namespace Shadster.AvatarTools
 
         public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType, float defaultValue, bool saved)
         {
-            
+
 
             var vrcExParams = vrcParameters.parameters.ToList();
             for (int i = 0; i < vrcParameters.parameters.Length; i++)
@@ -1068,12 +1041,98 @@ namespace Shadster.AvatarTools
                 if (paramName.Equals(fx.parameters[i].name))
                     fx.RemoveParameter(i); //Remove anyway just in case theres a new datatype
             }
-            fx.AddParameter(paramName,dataType);
+            fx.AddParameter(paramName, dataType);
 
             CreateVrcParameter(vrcAvatarDescriptor.expressionParameters, paramName, vrcParamType);
 
             EditorUtility.SetDirty(fx);
             AssetDatabase.Refresh();
+        }
+
+        public void MovePhysBonesFromArmature(GameObject vrcAvatar)
+        {
+            var armature = GetAvatarArmature(vrcAvatar);
+            var physbones = armature.GetComponentsInChildren<VRC_PhysBone>();
+            if (physbones.Length == 0)
+            {
+                EditorUtility.DisplayDialog("No PhysBones found!", "There are no PhysBones attached to armature in " + vrcAvatar.name, "Ok");
+                return;
+            }
+            if (vrcAvatar.transform.Find("PhysBones") != null)
+            {
+                EditorUtility.DisplayDialog("PhysBones Object exists!", "PhysBones Object already exists for this avatar!", "Ok");
+                return;
+            }
+            var physObjectRoot = new GameObject(name = "PhysBones");
+            physObjectRoot.transform.parent = vrcAvatar.transform;
+            foreach (var pBone in physbones)
+            {
+                var physObject = new GameObject(name = pBone.name);
+                physObject.transform.parent = physObjectRoot.transform;
+                var copyPBone = CopyComponent(pBone, physObject);
+
+                if (pBone.rootTransform == null)
+                {
+                    copyPBone.rootTransform = pBone.transform;
+                }
+                DestroyImmediate(pBone);
+            }
+        }
+
+        public void MovePhysCollidersFromArmature(GameObject vrcAvatar)
+        {
+            var armature = GetAvatarArmature(vrcAvatar);
+            var physcolliders = armature.GetComponentsInChildren<VRC_PhysCollider>();
+            var physbones = vrcAvatar.GetComponentsInChildren<VRC_PhysBone>();
+            if (physcolliders.Length == 0)
+            {
+                EditorUtility.DisplayDialog("No PhysColliders found!", "There are no PhysColliders attached to armature in " + vrcAvatar.name, "Ok");
+                return;
+            }
+            if (vrcAvatar.transform.Find("PhysColliders") != null)
+            {
+                EditorUtility.DisplayDialog("PhysCollider Object exists!", "PhysCollider Object already exists for this avatar!", "Ok");
+                return;
+            }
+            var physObjectRoot = new GameObject(name = "PhysColliders");
+            physObjectRoot.transform.parent = vrcAvatar.transform;
+            foreach (var pCollider in physcolliders)
+            {
+                var physObject = new GameObject(name = pCollider.name);
+                physObject.transform.parent = physObjectRoot.transform;
+                var copyPCollider = CopyComponent(pCollider, physObject);
+
+                if (pCollider.rootTransform == null)
+                {
+                    copyPCollider.rootTransform = pCollider.transform;
+                }
+
+                foreach (var pBone in physbones) //Move all possible colliders from physbones
+                {
+                    for (int i = 0; i < pBone.colliders.Count; i++)
+                    {
+                        if (pBone.colliders[i] == pCollider)
+                        {
+                            pBone.colliders[i] = copyPCollider;
+                        }
+                    }
+                }
+                DestroyImmediate(pCollider);
+            }
+        }
+
+        public void UpdatePhysBoneCollider(VRC_PhysBone pbone, VRC_PhysCollider pCollider)
+        {
+
+        }
+
+        public static T CopyComponent<T>(T original, GameObject destination) where T : Component
+        {
+            var type = original.GetType();
+            var copy = destination.AddComponent(type);
+            var fields = type.GetFields();
+            foreach (var field in fields) field.SetValue(copy, field.GetValue(original));
+            return copy as T;
         }
 
         public void OnGUI()
@@ -1109,18 +1168,18 @@ namespace Shadster.AvatarTools
                 var sceneToggleState = GUILayout.Toggle(startInSceneView, new GUIContent("Start Play Mode in Scene View", "Loads prefab that will start play mode to Scene view instead of starting in Game View"), GUILayout.Height(24));
                 if (sceneToggleState != startInSceneView)
                 {
-                    StartPlayModeInSceneView(sceneToggleState);
-                    startInSceneView = sceneToggleState;
+                    ShadstersAvatarTools.SetStartPlayModeInSceneView(sceneToggleState);
+                    startInSceneView = ShadstersAvatarTools.GetStartPlayModeInSceneView();
                 }
                 var playModeToggleState = GUILayout.Toggle(useExperimentalPlayMode, new GUIContent("Use Experimental Play Mode", "Instantly loads entering play mode, save often and disable if issues occur"), GUILayout.Height(24));
                 if (playModeToggleState != useExperimentalPlayMode)
-                { 
+                {
                     UseExperimentalPlayMode(playModeToggleState);
                     useExperimentalPlayMode = playModeToggleState;
 
                 }
             }
-            
+
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
             using (new EditorGUI.DisabledScope(vrcAvatarDescriptor == null))
             {
@@ -1165,10 +1224,10 @@ namespace Shadster.AvatarTools
                 //{
                 //    ResetAvatarBounds(vrcAvatar);
                 //}
-                
+
                 if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
                 {
-                    ClearAvatarBlueprintID(vrcAvatar);
+                    ShadstersAvatarTools.ClearAvatarBlueprintID(vrcAvatar);
                 }
                 if (GUILayout.Button("Save Avatar Prefab", GUILayout.Height(24)))
                 {
@@ -1193,28 +1252,31 @@ namespace Shadster.AvatarTools
                 {
                     UncheckAllWriteDefaults(vrcAvatarDescriptor);
                 }
-                
+
 
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
-
-                EditorGUILayout.LabelField("Breast Bones");
-                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                var fold = EditorGUILayout.Foldout(false, "Bones", true);
+                if (fold)
                 {
-                    breastBoneL = (Transform)EditorGUILayout.ObjectField(breastBoneL, typeof(Transform), true, GUILayout.Height(24));
-                    breastBoneR = (Transform)EditorGUILayout.ObjectField(breastBoneR, typeof(Transform), true, GUILayout.Height(24));
-                }
-                EditorGUILayout.LabelField("Butt Bones");
-                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-                {
-                    buttBoneL = (Transform)EditorGUILayout.ObjectField(buttBoneL, typeof(Transform), true, GUILayout.Height(24));
-                    buttBoneR = (Transform)EditorGUILayout.ObjectField(buttBoneR, typeof(Transform), true, GUILayout.Height(24));
-                }
-                if (GUILayout.Button("Auto Add PhysBones", GUILayout.Height(24)))
-                {
-                    AddPhysBones(breastBoneL);
-                    AddPhysBones(breastBoneR);
-                    AddButtPhysBones(buttBoneL);
-                    AddButtPhysBones(buttBoneR);
+                    EditorGUILayout.LabelField("Breast Bones");
+                    using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                    {
+                        breastBoneL = (Transform)EditorGUILayout.ObjectField(breastBoneL, typeof(Transform), true, GUILayout.Height(24));
+                        breastBoneR = (Transform)EditorGUILayout.ObjectField(breastBoneR, typeof(Transform), true, GUILayout.Height(24));
+                    }
+                    EditorGUILayout.LabelField("Butt Bones");
+                    using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                    {
+                        buttBoneL = (Transform)EditorGUILayout.ObjectField(buttBoneL, typeof(Transform), true, GUILayout.Height(24));
+                        buttBoneR = (Transform)EditorGUILayout.ObjectField(buttBoneR, typeof(Transform), true, GUILayout.Height(24));
+                    }
+                    if (GUILayout.Button("Auto Add PhysBones", GUILayout.Height(24)))
+                    {
+                        AddPhysBones(breastBoneL);
+                        AddPhysBones(breastBoneR);
+                        AddButtPhysBones(buttBoneL);
+                        AddButtPhysBones(buttBoneR);
+                    }
                 }
                 //if (GUILayout.Button("Update PhysBones", GUILayout.Height(24)))
                 //{
@@ -1223,6 +1285,17 @@ namespace Shadster.AvatarTools
                 //    AddButtPhysBones(buttBoneL);
                 //    AddButtPhysBones(buttBoneR);
                 //}
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Move PhysBones from Armature", GUILayout.Height(24)))
+                    {
+                        MovePhysBonesFromArmature(vrcAvatar);
+                    }
+                    if (GUILayout.Button("Move Colliders from Armature", GUILayout.Height(24)))
+                    {
+                        MovePhysCollidersFromArmature(vrcAvatar);
+                    }
+                }
                 if (GUILayout.Button("Set All Grab Movement to 1", GUILayout.Height(24)))
                 {
                     SetAllGrabMovement(vrcAvatar);
@@ -1292,7 +1365,11 @@ namespace Shadster.AvatarTools
                 {
                     CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
                 }
-                
+                if (GUILayout.Button("Cleanup & Export from current scene", GUILayout.Height(24)))
+                {
+                    ShadstersAvatarTools.Export();
+                }
+
 
             } // Using Disable Scope
             //EditorGUILayout.LabelField("<i> Version " + version + " </i>", new GUIStyle(GUI.skin.label)
