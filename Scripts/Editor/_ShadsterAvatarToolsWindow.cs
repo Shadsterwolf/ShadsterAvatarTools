@@ -729,32 +729,27 @@ namespace Shadster.AvatarTools
                     emoteState.motion = emote;
                     EditorUtility.SetDirty(emoteState);
 
-                    emptyState.AddTransition(new AnimatorStateTransition
-                    {
-                        destinationState = emoteState,
-                        hasFixedDuration = true,
-                        duration = 0f,
-                        exitTime = 0f,
-                        hasExitTime = false
-                    });
+                    emptyState.AddTransition(emoteState);
+                    emptyState.transitions[i].hasFixedDuration = true;
+                    emptyState.transitions[i].duration = 0f;
+                    emptyState.transitions[i].exitTime = 0f;
+                    emptyState.transitions[i].hasExitTime = false;
                     emptyState.transitions[i].AddCondition(AnimatorConditionMode.Equals, i + 1, paramName);
 
-                    emoteState.AddTransition(new AnimatorStateTransition
-                    {
-                        destinationState = emptyState,
-                        hasFixedDuration = true,
-                        duration = 0f,
-                        exitTime = 0f,
-                        hasExitTime = false
-                    });
+                    emoteState.AddTransition(emptyState);
+                    emoteState.transitions[0].hasFixedDuration = true;
+                    emoteState.transitions[0].duration = 0f;
+                    emoteState.transitions[0].exitTime = 0f;
+                    emoteState.transitions[0].hasExitTime = false;
                     emoteState.transitions[0].AddCondition(AnimatorConditionMode.NotEqual, i + 1, paramName);
 
                     CreateMenuControl(menu, emote.name, VRCExpressionsMenu.Control.ControlType.Toggle, paramName, i + 1);
                 }
                 fx.layers = fxLayers; //fixes save for default weight for some reason
 
-                EditorUtility.SetDirty(fx);
-                AssetDatabase.Refresh();
+
+                //EditorUtility.SetDirty(fx);
+                //AssetDatabase.Refresh();
                 AssetDatabase.SaveAssets();
             }
         }
@@ -762,7 +757,8 @@ namespace Shadster.AvatarTools
         public static AnimatorController GetFxController(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
             var runtime = vrcAvatarDescriptor.baseAnimationLayers[4].animatorController;
-            return AssetDatabase.LoadAssetAtPath<AnimatorController>(AssetDatabase.GetAssetPath(runtime));
+            //return AssetDatabase.LoadAssetAtPath<AnimatorController>(AssetDatabase.GetAssetPath(runtime));
+            return (AnimatorController)runtime;
         }
 
         private void DeleteExistingFxLayer(AnimatorController fx, string layerName)
@@ -796,31 +792,21 @@ namespace Shadster.AvatarTools
             endState.writeDefaultValues = false;
             endState.motion = clipB;
 
-            EditorUtility.SetDirty(startState);
-            EditorUtility.SetDirty(endState);
-
-            startState.AddTransition(new AnimatorStateTransition
-            {
-                destinationState = endState,
-                hasFixedDuration = true,
-                duration = 0f,
-                exitTime = 0f,
-                hasExitTime = false
-            });
+            startState.AddTransition(endState);
+            startState.transitions[0].hasFixedDuration = true;
+            startState.transitions[0].duration = 0f;
+            startState.transitions[0].exitTime = 0f;
+            startState.transitions[0].hasExitTime = false;
             startState.transitions[0].AddCondition(AnimatorConditionMode.If, 0f, paramName);
 
-            endState.AddTransition(new AnimatorStateTransition
-            {
-                destinationState = startState,
-                hasFixedDuration = true,
-                duration = 0f,
-                exitTime = 0f,
-                hasExitTime = false
-            });
+            endState.AddTransition(startState);
+            endState.transitions[0].hasFixedDuration = true;
+            endState.transitions[0].duration = 0f;
+            endState.transitions[0].exitTime = 0f;
+            endState.transitions[0].hasExitTime = false;
             endState.transitions[0].AddCondition(AnimatorConditionMode.IfNot, 0f, paramName);
 
             fx.layers = fxLayers; //fixes save for default weight for some reason
-
             EditorUtility.SetDirty(fx);
             AssetDatabase.Refresh();
             AssetDatabase.SaveAssets();
@@ -844,15 +830,16 @@ namespace Shadster.AvatarTools
             var newLayer = fxLayers[fx.layers.Length - 1];
             newLayer.defaultWeight = 1f;
 
-            var newBlendTreeState = newLayer.stateMachine.AddState("Blend Tree", new Vector3(250, 120));
             var newBlendTree = new BlendTree();
+            fx.CreateBlendTreeInController(layerName, out newBlendTree, fx.layers.Length - 1); //Just WTF unity, just whyyyyyyyyyy
             newBlendTree.AddChild(clipA, 0);
             newBlendTree.AddChild(clipB, 1);
             newBlendTree.name = "Blend Tree";
             newBlendTree.blendParameter = paramName;
             newBlendTree.blendType = BlendTreeType.Simple1D;
-            newBlendTreeState.motion = newBlendTree;
-            newBlendTreeState.writeDefaultValues = false;
+            newBlendTree.hideFlags = HideFlags.HideAndDontSave; //Because Unity, for some reason, doesn't want the Interface and Code to have the same defaults
+            newLayer.stateMachine.states[0].state.writeDefaultValues = false;
+            newLayer.stateMachine.states[0].position = new Vector3(250, 120); //Doesn't work for some reason?
 
             fx.layers = fxLayers; //fixes save for default weight for some reason
 
