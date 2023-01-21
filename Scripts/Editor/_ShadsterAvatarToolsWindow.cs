@@ -25,6 +25,7 @@ namespace Shadster.AvatarTools
         static EditorWindow toolWindow;
         private bool startInSceneView;
         private bool useExperimentalPlayMode;
+        private bool ignorePhysImmobile;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
@@ -69,13 +70,14 @@ namespace Shadster.AvatarTools
             if (EditorApplication.isPlaying) return;
             useExperimentalPlayMode = EditorSettings.enterPlayModeOptionsEnabled;
             startInSceneView = ShadstersAvatarTools.GetStartPlayModeInSceneView();
+            ignorePhysImmobile = ShadstersAvatarTools.GetIgnorePhysImmobile();
         }
 
         private void OnInspectorUpdate()
         {
             if (vrcAvatar != null && vrcAvatarDescriptor == null) //because play mode likes to **** with me and clear the descriptor
                 vrcAvatarDescriptor = vrcAvatar.GetComponent<VRCAvatarDescriptor>();
-        }
+        }        
 
         [MenuItem("ShadsterWolf/Show Avatar Tools", false, 0)]
         public static void ShowWindow()
@@ -110,11 +112,11 @@ namespace Shadster.AvatarTools
 
         public void AutoDetect()
         {
-            vrcAvatarDescriptor = SelectCurrentAvatarDescriptor();
+            vrcAvatarDescriptor = ShadstersAvatarTools.SelectCurrentAvatarDescriptor();
             vrcAvatar = vrcAvatarDescriptor.gameObject;
             vrcMenu = vrcAvatarDescriptor.expressionsMenu;
             vrcParameters = vrcAvatarDescriptor.expressionParameters;
-
+            
             breastBoneL = GetAvatarBone(vrcAvatar, "Breast", "_L");
             breastBoneR = GetAvatarBone(vrcAvatar, "Breast", "_R");
             buttBoneL = GetAvatarBone(vrcAvatar, "Butt", "_L");
@@ -140,25 +142,7 @@ namespace Shadster.AvatarTools
             editorSettings.ApplyModifiedProperties();
         }
 
-        public static VRCAvatarDescriptor SelectCurrentAvatarDescriptor()
-        {
-            VRCAvatarDescriptor avatarDescriptor = null;
-            //Get current selected avatar
-            if (Selection.activeTransform && Selection.activeTransform.root.gameObject.GetComponent<VRCAvatarDescriptor>() != null)
-            {
-                avatarDescriptor = Selection.activeTransform.root.GetComponent<VRCAvatarDescriptor>();
-                if (avatarDescriptor != null)
-                    return avatarDescriptor;
-            }
-            //Find first potential avatar
-            var potentialObjects = Object.FindObjectsOfType<VRCAvatarDescriptor>().ToArray();
-            if (potentialObjects.Length > 0)
-            {
-                avatarDescriptor = potentialObjects.First();
-            }
-
-            return avatarDescriptor;
-        }
+        
 
         private static List<SkinnedMeshRenderer> GetAvatarSkinnedMeshRenderers(GameObject root, Bounds bounds)
         {
@@ -230,16 +214,8 @@ namespace Shadster.AvatarTools
             foreach (Renderer r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
             {
                 Undo.RecordObject(r, "Set Avatar Anchor Probe");
-                r.probeAnchor = GetAvatarArmature(vrcAvatar).Find("Hips");
+                r.probeAnchor = vrcAvatar.transform.Find("Armature").Find("Hips");
             }
-        }
-
-        public static Transform GetAvatarArmature(GameObject vrcAvatar)
-        {
-            Transform vrcTransform = vrcAvatar.transform;
-            Transform armature = vrcTransform.Find("Armature");
-
-            return armature;
         }
 
         public static bool GogoLocoExist()
@@ -295,7 +271,7 @@ namespace Shadster.AvatarTools
 
         private Transform GetAvatarBone(GameObject vrcAvatar, string search, string direction)
         {
-            Transform armature = GetAvatarArmature(vrcAvatar);
+            Transform armature = vrcAvatar.transform.Find("Armature");
             Transform result = null;
             if (armature != null)
             {
@@ -318,7 +294,7 @@ namespace Shadster.AvatarTools
 
         public static List<VRC_PhysBone> GetAllAvatarPhysBones(GameObject vrcAvatar)
         {
-            Transform armature = GetAvatarArmature(vrcAvatar);
+            Transform armature = vrcAvatar.transform.Find("Armature");
             List<VRC_PhysBone> result = new List<VRC_PhysBone>();
             if (armature != null)
             {
@@ -339,7 +315,7 @@ namespace Shadster.AvatarTools
 
         private static void DeleteEndBones(GameObject vrcAvatar)
         {
-            Transform armature = GetAvatarArmature(vrcAvatar);
+            Transform armature = vrcAvatar.transform.Find("Armature");
             if (armature != null)
             {
                 foreach (Transform bone in armature.GetComponentsInChildren<Transform>(true))
@@ -353,7 +329,7 @@ namespace Shadster.AvatarTools
             }
         }
 
-
+        
 
         public static AnimationCurve LinearAnimationCurve()
         {
@@ -558,8 +534,29 @@ namespace Shadster.AvatarTools
             if (!(AssetDatabase.IsValidFolder(savePath)))
                 Directory.CreateDirectory(savePath);
             savePath = savePath + "/" + anim.name + ".anim";
-            AssetDatabase.CreateAsset(anim, savePath);
+            CreateOrReplaceAsset<AnimationClip>(anim, savePath);
+
+            AssetDatabase.SaveAssets();
         }
+
+        private static T CreateOrReplaceAsset<T>(T asset, string path) where T : Object
+        {
+            T existingAsset = AssetDatabase.LoadAssetAtPath<T>(path);
+
+            if (existingAsset == null)
+            {
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            else
+            {
+                if (typeof(Mesh).IsAssignableFrom(typeof(T))) { (existingAsset as Mesh)?.Clear(); }
+                EditorUtility.CopySerialized(asset, existingAsset);
+                existingAsset = asset;
+            }
+
+            return existingAsset;
+        }
+
 
         private static void GenerateAnimationRenderToggles(GameObject vrcAvatar)
         {
@@ -575,11 +572,11 @@ namespace Shadster.AvatarTools
                 aClipOff.name = r.name + " OFF";
                 aClipOn.name = r.name + " ON";
                 var path = AnimationUtility.CalculateTransformPath(r.transform, vrcAvatar.transform);
-                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
+                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));         
                 aClipOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
                 allOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
                 allOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
-
+                
                 SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
                 SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
             }
@@ -631,7 +628,7 @@ namespace Shadster.AvatarTools
                             {
                                 if (smr.sharedMesh.GetBlendShapeName(i) == smr2.sharedMesh.GetBlendShapeName(j)) //Matching shapes found
                                 {
-                                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr2.transform, vrcAvatar.transform));
+                                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr2.transform, vrcAvatar.transform)); 
                                 }
                             }
                         }
@@ -659,7 +656,7 @@ namespace Shadster.AvatarTools
 
         private static void CombineEmoteShapekeys(GameObject vrcAvatar)
         {
-
+            
             List<int> blendIndex = new List<int>();
             foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
@@ -709,7 +706,7 @@ namespace Shadster.AvatarTools
                 string layerName = "Emote Override Control";
                 CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
                 var menu = CreateNewMenu("Menu_EmoteOverride");
-                var fx = GetFxController(vrcAvatarDescriptor);
+                var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
                 DeleteExistingFxLayer(fx, layerName);
                 fx.AddLayer(layerName);
                 var fxLayers = fx.layers;
@@ -743,22 +740,15 @@ namespace Shadster.AvatarTools
                     emoteState.transitions[0].hasExitTime = false;
                     emoteState.transitions[0].AddCondition(AnimatorConditionMode.NotEqual, i + 1, paramName);
 
-                    CreateMenuControl(menu, emote.name, VRCExpressionsMenu.Control.ControlType.Toggle, paramName, i + 1);
+                    CreateMenuControl(menu, emote.name, VRCExpressionsMenu.Control.ControlType.Toggle, paramName, i+1);
                 }
                 fx.layers = fxLayers; //fixes save for default weight for some reason
-
+                
 
                 //EditorUtility.SetDirty(fx);
                 //AssetDatabase.Refresh();
                 AssetDatabase.SaveAssets();
             }
-        }
-
-        public static AnimatorController GetFxController(VRCAvatarDescriptor vrcAvatarDescriptor)
-        {
-            var runtime = vrcAvatarDescriptor.baseAnimationLayers[4].animatorController;
-            //return AssetDatabase.LoadAssetAtPath<AnimatorController>(AssetDatabase.GetAssetPath(runtime));
-            return (AnimatorController)runtime;
         }
 
         private void DeleteExistingFxLayer(AnimatorController fx, string layerName)
@@ -775,7 +765,7 @@ namespace Shadster.AvatarTools
 
         private void CreateToggle(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
-            var fx = GetFxController(vrcAvatarDescriptor);
+            var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
             CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
             DeleteExistingFxLayer(fx, layerName);
 
@@ -814,7 +804,7 @@ namespace Shadster.AvatarTools
 
         private void CreateBlendTree(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
-            var fx = GetFxController(vrcAvatarDescriptor);
+            var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
             CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
 
             for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
@@ -894,14 +884,13 @@ namespace Shadster.AvatarTools
         }
 
 
-
         private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, VRCExpressionsMenu subMenu, Texture2D icon, int value)
         {
             foreach (var control in vrcMenu.controls)
             {
                 if (control.name.Equals(controlName))
                 {
-                    vrcMenu.controls.Remove(control);
+                    vrcMenu.controls.Remove(control); 
                     break;
                 }
             }
@@ -910,8 +899,7 @@ namespace Shadster.AvatarTools
                 EditorUtility.DisplayDialog("Menu control full!", "Free up controls or make a new one", "Ok");
                 return;
             }
-            var item = new VRCExpressionsMenu.Control
-            {
+            var item = new VRCExpressionsMenu.Control {
                 name = controlName,
                 type = controlType,
                 value = value
@@ -964,7 +952,7 @@ namespace Shadster.AvatarTools
 
         public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType, float defaultValue, bool saved)
         {
-
+            
 
             var vrcExParams = vrcParameters.parameters.ToList();
             for (int i = 0; i < vrcParameters.parameters.Length; i++)
@@ -1020,7 +1008,7 @@ namespace Shadster.AvatarTools
 
         public static void CreateFxParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, AnimatorControllerParameterType dataType)
         {
-            var fx = GetFxController(vrcAvatarDescriptor);
+            var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
             VRCExpressionParameters.ValueType vrcParamType = ConvertAnimatorToVrcParamType(dataType);
 
             for (int i = 0; i < fx.parameters.Length; i++)
@@ -1028,98 +1016,12 @@ namespace Shadster.AvatarTools
                 if (paramName.Equals(fx.parameters[i].name))
                     fx.RemoveParameter(i); //Remove anyway just in case theres a new datatype
             }
-            fx.AddParameter(paramName, dataType);
+            fx.AddParameter(paramName,dataType);
 
             CreateVrcParameter(vrcAvatarDescriptor.expressionParameters, paramName, vrcParamType);
 
             EditorUtility.SetDirty(fx);
             AssetDatabase.Refresh();
-        }
-
-        public void MovePhysBonesFromArmature(GameObject vrcAvatar)
-        {
-            var armature = GetAvatarArmature(vrcAvatar);
-            var physbones = armature.GetComponentsInChildren<VRC_PhysBone>();
-            if (physbones.Length == 0)
-            {
-                EditorUtility.DisplayDialog("No PhysBones found!", "There are no PhysBones attached to armature in " + vrcAvatar.name, "Ok");
-                return;
-            }
-            if (vrcAvatar.transform.Find("PhysBones") != null)
-            {
-                EditorUtility.DisplayDialog("PhysBones Object exists!", "PhysBones Object already exists for this avatar!", "Ok");
-                return;
-            }
-            var physObjectRoot = new GameObject(name = "PhysBones");
-            physObjectRoot.transform.parent = vrcAvatar.transform;
-            foreach (var pBone in physbones)
-            {
-                var physObject = new GameObject(name = pBone.name);
-                physObject.transform.parent = physObjectRoot.transform;
-                var copyPBone = CopyComponent(pBone, physObject);
-
-                if (pBone.rootTransform == null)
-                {
-                    copyPBone.rootTransform = pBone.transform;
-                }
-                DestroyImmediate(pBone);
-            }
-        }
-
-        public void MovePhysCollidersFromArmature(GameObject vrcAvatar)
-        {
-            var armature = GetAvatarArmature(vrcAvatar);
-            var physcolliders = armature.GetComponentsInChildren<VRC_PhysCollider>();
-            var physbones = vrcAvatar.GetComponentsInChildren<VRC_PhysBone>();
-            if (physcolliders.Length == 0)
-            {
-                EditorUtility.DisplayDialog("No PhysColliders found!", "There are no PhysColliders attached to armature in " + vrcAvatar.name, "Ok");
-                return;
-            }
-            if (vrcAvatar.transform.Find("PhysColliders") != null)
-            {
-                EditorUtility.DisplayDialog("PhysCollider Object exists!", "PhysCollider Object already exists for this avatar!", "Ok");
-                return;
-            }
-            var physObjectRoot = new GameObject(name = "PhysColliders");
-            physObjectRoot.transform.parent = vrcAvatar.transform;
-            foreach (var pCollider in physcolliders)
-            {
-                var physObject = new GameObject(name = pCollider.name);
-                physObject.transform.parent = physObjectRoot.transform;
-                var copyPCollider = CopyComponent(pCollider, physObject);
-
-                if (pCollider.rootTransform == null)
-                {
-                    copyPCollider.rootTransform = pCollider.transform;
-                }
-
-                foreach (var pBone in physbones) //Move all possible colliders from physbones
-                {
-                    for (int i = 0; i < pBone.colliders.Count; i++)
-                    {
-                        if (pBone.colliders[i] == pCollider)
-                        {
-                            pBone.colliders[i] = copyPCollider;
-                        }
-                    }
-                }
-                DestroyImmediate(pCollider);
-            }
-        }
-
-        public void UpdatePhysBoneCollider(VRC_PhysBone pbone, VRC_PhysCollider pCollider)
-        {
-
-        }
-
-        public static T CopyComponent<T>(T original, GameObject destination) where T : Component
-        {
-            var type = original.GetType();
-            var copy = destination.AddComponent(type);
-            var fields = type.GetFields();
-            foreach (var field in fields) field.SetValue(copy, field.GetValue(original));
-            return copy as T;
         }
 
         public void OnGUI()
@@ -1160,10 +1062,19 @@ namespace Shadster.AvatarTools
                 }
                 var playModeToggleState = GUILayout.Toggle(useExperimentalPlayMode, new GUIContent("Use Experimental Play Mode", "Instantly loads entering play mode, save often and disable if issues occur"), GUILayout.Height(24));
                 if (playModeToggleState != useExperimentalPlayMode)
-                {
+                { 
                     UseExperimentalPlayMode(playModeToggleState);
                     useExperimentalPlayMode = playModeToggleState;
 
+                }
+            }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var ignorePhysToggleState = GUILayout.Toggle(ignorePhysImmobile, new GUIContent("Ignore Physbone Immobile World", "When in Play Mode, updates all physbones with Immobile World Type to zero"), GUILayout.Height(24));
+                if (ignorePhysToggleState != ignorePhysImmobile)
+                {
+                    ShadstersAvatarTools.SetIgnorePhysImmobile(ignorePhysToggleState);
+                    ignorePhysImmobile = ShadstersAvatarTools.GetIgnorePhysImmobile();
                 }
             }
 
@@ -1211,7 +1122,7 @@ namespace Shadster.AvatarTools
                 //{
                 //    ResetAvatarBounds(vrcAvatar);
                 //}
-
+                
                 if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
                 {
                     ShadstersAvatarTools.ClearAvatarBlueprintID(vrcAvatar);
@@ -1239,7 +1150,7 @@ namespace Shadster.AvatarTools
                 {
                     UncheckAllWriteDefaults(vrcAvatarDescriptor);
                 }
-
+                
 
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
                 var fold = EditorGUILayout.Foldout(false, "Bones", true);
@@ -1276,11 +1187,11 @@ namespace Shadster.AvatarTools
                 {
                     if (GUILayout.Button("Move PhysBones from Armature", GUILayout.Height(24)))
                     {
-                        MovePhysBonesFromArmature(vrcAvatar);
+                        ShadstersAvatarTools.MovePhysBonesFromArmature(vrcAvatar);
                     }
                     if (GUILayout.Button("Move Colliders from Armature", GUILayout.Height(24)))
                     {
-                        MovePhysCollidersFromArmature(vrcAvatar);
+                        ShadstersAvatarTools.MovePhysCollidersFromArmature(vrcAvatar);
                     }
                 }
                 if (GUILayout.Button("Set All Grab Movement to 1", GUILayout.Height(24)))
@@ -1352,11 +1263,15 @@ namespace Shadster.AvatarTools
                 {
                     CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
                 }
-                if (GUILayout.Button("Cleanup & Export from current scene", GUILayout.Height(24)))
+                if (GUILayout.Button("Cleanup Unused Generated Animations", GUILayout.Height(24)))
+                {
+                    ShadstersAvatarTools.CleanupUnusedGeneratedAnimations();
+                }
+                if (GUILayout.Button("Cleanup Avatar & Export from current scene", GUILayout.Height(24)))
                 {
                     ShadstersAvatarTools.Export();
                 }
-
+                
 
             } // Using Disable Scope
             //EditorGUILayout.LabelField("<i> Version " + version + " </i>", new GUIStyle(GUI.skin.label)
