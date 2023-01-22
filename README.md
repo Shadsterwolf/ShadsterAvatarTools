@@ -11,7 +11,6 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 1. Import latest VRCSDK (if you havent already done so)
 2. Import my provided released package
 3. In Unity, on your toolbar, click "ShadsterWolf" > Show Avatar Tools
-(Pro tip: You can use Alt+S twice to open the main tool window)
 
 # Features
 - Quick Sceneview and Playmode speed up toggles

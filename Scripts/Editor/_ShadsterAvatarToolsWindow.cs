@@ -23,6 +23,7 @@ namespace Shadster.AvatarTools
         [SerializeField, HideInInspector] static ShadstersAvatarTools _tools;
 
         static EditorWindow toolWindow;
+        Vector2 scrollPos;
         private bool startInSceneView;
         private bool useExperimentalPlayMode;
         private bool ignorePhysImmobile;
@@ -1026,6 +1027,7 @@ namespace Shadster.AvatarTools
 
         public void OnGUI()
         {
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(position.width), GUILayout.Height(position.height));
             using (new EditorGUILayout.HorizontalScope())
             {
                 vrcAvatarDescriptor = (VRCAvatarDescriptor)EditorGUILayout.ObjectField(vrcAvatarDescriptor, typeof(VRCAvatarDescriptor), true, GUILayout.Height(24));
@@ -1279,7 +1281,7 @@ namespace Shadster.AvatarTools
             //    richText = true,
             //    alignment = TextAnchor.MiddleRight
             //});
-
+            EditorGUILayout.EndScrollView();
         } // GUI
     } // Class
 } // Namespace

@@ -15,6 +15,7 @@ namespace Shadster.AvatarTools.FxSetup
         [SerializeField, HideInInspector] static _FxSetupWindow _tools;
 
         static EditorWindow toolWindow;
+        Vector2 scrollPos;
         private bool startInSceneView;
         private bool useExperimentalPlayMode;
 
@@ -184,6 +185,7 @@ namespace Shadster.AvatarTools.FxSetup
 
         public void OnGUI()
         {
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(position.width), GUILayout.Height(position.height));
             using (new EditorGUILayout.HorizontalScope())
             {
                 vrcAvatarDescriptor = (VRCAvatarDescriptor)EditorGUILayout.ObjectField(vrcAvatarDescriptor, typeof(VRCAvatarDescriptor), true, GUILayout.Height(24));
@@ -232,7 +234,6 @@ namespace Shadster.AvatarTools.FxSetup
             {
                 DrawFxMulti();
             }
-
             //for (int i = 0; i < _meshRenderers.Length; i++)
             //{
             //    EditorGUILayout.BeginHorizontal();
@@ -267,7 +268,8 @@ namespace Shadster.AvatarTools.FxSetup
             //    }
             //    EditorGUILayout.EndHorizontal();
             //}
-        }
+            EditorGUILayout.EndScrollView();
+        } //End GUI
     }
 }
 
