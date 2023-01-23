@@ -243,21 +243,9 @@ namespace Shadster.AvatarTools
             //Debug.Log(AssetDatabase.GetAssetPath(vrcAvatarDescriptor.specialAnimationLayers[0].animatorController));
         }
 
-        private static void SetupGogoLocoMenu(VRCExpressionsMenu vrcMenu)
-        {
-            var subMenu = (VRCExpressionsMenu)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoMenus/GoAllMainMenu.asset", typeof(VRCExpressionsMenu));
-            var icon = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/Icons/icon_Go_Loco.png", typeof(Texture2D));
-            CreateMenuControl(vrcMenu, "GoGo Loco Menu", VRCExpressionsMenu.Control.ControlType.SubMenu, "", subMenu, icon);
-        }
+        
 
-        private static void SetupGogoLocoParams(VRCExpressionParameters vrcParameters)
-        {
-            CreateVrcParameter(vrcParameters, "VRCEmote", VRCExpressionParameters.ValueType.Int, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/Float", VRCExpressionParameters.ValueType.Float, 0.25f, false);
-            CreateVrcParameter(vrcParameters, "Go/Stationary", VRCExpressionParameters.ValueType.Bool, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/Locomotion", VRCExpressionParameters.ValueType.Bool, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/JumpAndFall", VRCExpressionParameters.ValueType.Bool, 0, true);
-        }
+        
 
         public float GetAvatarHeight(GameObject vrcAvatar)
         {
@@ -529,501 +517,7 @@ namespace Shadster.AvatarTools
                     }
                 }
             }
-        }
-        private static void SaveAnimation(AnimationClip anim, string savePath)
-        {
-            if (!(AssetDatabase.IsValidFolder(savePath)))
-                Directory.CreateDirectory(savePath);
-            savePath = savePath + "/" + anim.name + ".anim";
-            CreateOrReplaceAsset<AnimationClip>(anim, savePath);
-
-            AssetDatabase.SaveAssets();
-        }
-
-        private static T CreateOrReplaceAsset<T>(T asset, string path) where T : Object
-        {
-            T existingAsset = AssetDatabase.LoadAssetAtPath<T>(path);
-
-            if (existingAsset == null)
-            {
-                AssetDatabase.CreateAsset(asset, path);
-            }
-            else
-            {
-                if (typeof(Mesh).IsAssignableFrom(typeof(T))) { (existingAsset as Mesh)?.Clear(); }
-                EditorUtility.CopySerialized(asset, existingAsset);
-                existingAsset = asset;
-            }
-
-            return existingAsset;
-        }
-
-
-        private static void GenerateAnimationRenderToggles(GameObject vrcAvatar)
-        {
-            AnimationClip allOff = new AnimationClip();
-            AnimationClip allOn = new AnimationClip();
-            allOff.name = "all OFF";
-            allOn.name = "all ON";
-            foreach (var r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
-            {
-                //Debug.Log(r.name);
-                AnimationClip aClipOff = new AnimationClip();
-                AnimationClip aClipOn = new AnimationClip();
-                aClipOff.name = r.name + " OFF";
-                aClipOn.name = r.name + " ON";
-                var path = AnimationUtility.CalculateTransformPath(r.transform, vrcAvatar.transform);
-                aClipOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));         
-                aClipOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
-                allOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
-                allOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
-                
-                SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
-                SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
-            }
-            SaveAnimation(allOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
-            SaveAnimation(allOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
-
-        }
-
-        private static void GenerateAnimationShapekeys(GameObject vrcAvatar)
-        {
-            foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                Debug.Log(smr.name);
-                for (int i = 0; i < smr.sharedMesh.blendShapeCount; i++)
-                {
-                    //Debug.Log(smr.sharedMesh.GetBlendShapeName(i));
-                    AnimationClip aClipMin = new AnimationClip();
-                    AnimationClip aClipMax = new AnimationClip();
-                    var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                    aClipMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 0)));
-                    aClipMin.name = smr.name + "_" + smr.sharedMesh.GetBlendShapeName(i) + " MIN";
-                    aClipMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
-                    aClipMax.name = smr.name + "_" + smr.sharedMesh.GetBlendShapeName(i) + " MAX";
-
-                    SaveAnimation(aClipMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
-                    SaveAnimation(aClipMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
-                }
-            }
-        }
-
-        private static void CombineAnimationShapekeys(GameObject vrcAvatar)
-        {
-            List<string> blendPaths = new List<string>();
-            AnimationClip allMin = new AnimationClip();
-            AnimationClip allMax = new AnimationClip();
-            allMin.name = "all MIN";
-            allMax.name = "all MAX";
-            foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                //Debug.Log(smr.name);
-                for (int i = 0; i < smr.sharedMesh.blendShapeCount; i++)
-                {
-                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform)); //First blend path
-                    foreach (var smr2 in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true)) //check other skinned mesh renders
-                    {
-                        if (smr.name != smr2.name)
-                        {
-                            for (int j = 0; j < smr2.sharedMesh.blendShapeCount; j++) //check those render's shapekeys
-                            {
-                                if (smr.sharedMesh.GetBlendShapeName(i) == smr2.sharedMesh.GetBlendShapeName(j)) //Matching shapes found
-                                {
-                                    blendPaths.Add(AnimationUtility.CalculateTransformPath(smr2.transform, vrcAvatar.transform)); 
-                                }
-                            }
-                        }
-                    }
-                    AnimationClip aClipMin = new AnimationClip();
-                    AnimationClip aClipMax = new AnimationClip();
-                    aClipMin.name = smr.sharedMesh.GetBlendShapeName(i) + " MIN";
-                    aClipMax.name = smr.sharedMesh.GetBlendShapeName(i) + " MAX";
-                    foreach (var path in blendPaths)
-                    {
-                        //var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                        aClipMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 0)));
-                        allMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 0)));
-                        aClipMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
-                        allMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
-                    }
-                    SaveAnimation(aClipMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
-                    SaveAnimation(aClipMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
-                    blendPaths.Clear();
-                }
-            }
-            SaveAnimation(allMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
-            SaveAnimation(allMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
-        }
-
-        private static void CombineEmoteShapekeys(GameObject vrcAvatar)
-        {
-            
-            List<int> blendIndex = new List<int>();
-            foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
-            {
-                string blendPath = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                for (int i = 0; i < smr.sharedMesh.blendShapeCount; i++)
-                {
-                    if (smr.sharedMesh.GetBlendShapeName(i).Contains("Emote"))
-                    {
-                        blendIndex.Add(i);
-                    }
-                }
-                if (blendIndex.Count > 0)
-                {
-                    //Debug.Log("SMR NAME: " + smr.name);
-                    //Debug.Log("INDEX COUNT: " + blendIndex.Count);
-                    AnimationClip emoteIdle = new AnimationClip();
-                    emoteIdle.name = "Emote_Idle";
-                    for (int i = 0; i < blendIndex.Count; i++)
-                    {
-                        AnimationClip emoteClip = new AnimationClip();
-                        emoteClip.name = smr.sharedMesh.GetBlendShapeName(blendIndex[i]);
-                        emoteClip.SetCurve(blendPath, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(blendIndex[i]), new AnimationCurve(new Keyframe(0, 100)));
-                        emoteIdle.SetCurve(blendPath, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(blendIndex[i]), new AnimationCurve(new Keyframe(0, 0)));
-                        for (int j = 0; j < blendIndex.Count; j++)
-                        {
-                            if (blendIndex[i] != blendIndex[j])
-                            {
-                                emoteClip.SetCurve(blendPath, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(blendIndex[j]), new AnimationCurve(new Keyframe(0, 0)));
-                            }
-
-                        }
-                        SaveAnimation(emoteClip, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes");
-                    }
-                    SaveAnimation(emoteIdle, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes");
-                    blendIndex.Clear();
-                }
-            }
-        }
-
-        private void GenerateEmoteOverrideMenu(VRCAvatarDescriptor vrcAvatarDescriptor)
-        {
-            if (Directory.Exists(GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes"))
-            {
-                var dir = new DirectoryInfo(GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes");
-                var emoteFiles = dir.GetFiles("*.anim");
-                string paramName = "EmoteOverride";
-                string layerName = "Emote Override Control";
-                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
-                var menu = CreateNewMenu("Menu_EmoteOverride");
-                var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
-                DeleteExistingFxLayer(fx, layerName);
-                fx.AddLayer(layerName);
-                var fxLayers = fx.layers;
-                var newLayer = fxLayers[fx.layers.Length - 1];
-                newLayer.defaultWeight = 1f;
-                var emptyState = newLayer.stateMachine.AddState("Empty", new Vector3(250, 220));
-                emptyState.writeDefaultValues = true; //Reset defaults as we don't want to override anymore
-                EditorUtility.SetDirty(emptyState);
-                for (int i = 0; i < emoteFiles.Length; i++)
-                {
-                    var emoteAsset = "Assets" + emoteFiles[i].FullName.Substring(Application.dataPath.Length);
-                    var emote = AssetDatabase.LoadAssetAtPath(emoteAsset, typeof(AnimationClip)) as AnimationClip;
-                    //var emote = Resources.Load<AnimationClip>(emoteFiles[i].FullName);
-
-                    var emoteState = newLayer.stateMachine.AddState(emote.name, new Vector3(650, 20 + (i * 50)));
-                    emoteState.writeDefaultValues = false;
-                    emoteState.motion = emote;
-                    EditorUtility.SetDirty(emoteState);
-
-                    emptyState.AddTransition(emoteState);
-                    emptyState.transitions[i].hasFixedDuration = true;
-                    emptyState.transitions[i].duration = 0f;
-                    emptyState.transitions[i].exitTime = 0f;
-                    emptyState.transitions[i].hasExitTime = false;
-                    emptyState.transitions[i].AddCondition(AnimatorConditionMode.Equals, i + 1, paramName);
-
-                    emoteState.AddTransition(emptyState);
-                    emoteState.transitions[0].hasFixedDuration = true;
-                    emoteState.transitions[0].duration = 0f;
-                    emoteState.transitions[0].exitTime = 0f;
-                    emoteState.transitions[0].hasExitTime = false;
-                    emoteState.transitions[0].AddCondition(AnimatorConditionMode.NotEqual, i + 1, paramName);
-
-                    CreateMenuControl(menu, emote.name, VRCExpressionsMenu.Control.ControlType.Toggle, paramName, i+1);
-                }
-                fx.layers = fxLayers; //fixes save for default weight for some reason
-                
-
-                //EditorUtility.SetDirty(fx);
-                //AssetDatabase.Refresh();
-                AssetDatabase.SaveAssets();
-            }
-        }
-
-        private void DeleteExistingFxLayer(AnimatorController fx, string layerName)
-        {
-            for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
-            {
-                if (fx.layers[i].name.Equals(layerName))
-                {
-                    fx.RemoveLayer(i);
-                    break;
-                }
-            }
-        }
-
-        private void CreateToggle(VRCAvatarDescriptor vrcAvatarDescriptor)
-        {
-            var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
-            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
-            DeleteExistingFxLayer(fx, layerName);
-
-            fx.AddLayer(layerName);
-            var fxLayers = fx.layers;
-            var newLayer = fxLayers[fx.layers.Length - 1];
-            newLayer.defaultWeight = 1f;
-
-            var startState = newLayer.stateMachine.AddState(clipA.name, new Vector3(250, 120));
-            startState.writeDefaultValues = false;
-            startState.motion = clipA;
-
-            var endState = newLayer.stateMachine.AddState(clipB.name, new Vector3(250, 20));
-            endState.writeDefaultValues = false;
-            endState.motion = clipB;
-
-            startState.AddTransition(endState);
-            startState.transitions[0].hasFixedDuration = true;
-            startState.transitions[0].duration = 0f;
-            startState.transitions[0].exitTime = 0f;
-            startState.transitions[0].hasExitTime = false;
-            startState.transitions[0].AddCondition(AnimatorConditionMode.If, 0f, paramName);
-
-            endState.AddTransition(startState);
-            endState.transitions[0].hasFixedDuration = true;
-            endState.transitions[0].duration = 0f;
-            endState.transitions[0].exitTime = 0f;
-            endState.transitions[0].hasExitTime = false;
-            endState.transitions[0].AddCondition(AnimatorConditionMode.IfNot, 0f, paramName);
-
-            fx.layers = fxLayers; //fixes save for default weight for some reason
-            EditorUtility.SetDirty(fx);
-            AssetDatabase.Refresh();
-            AssetDatabase.SaveAssets();
-        }
-
-        private void CreateBlendTree(VRCAvatarDescriptor vrcAvatarDescriptor)
-        {
-            var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
-            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
-
-            for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
-            {
-                if (fx.layers[i].name.Equals(layerName))
-                {
-                    fx.RemoveLayer(i);
-                    break;
-                }
-            }
-            fx.AddLayer(layerName);
-            var fxLayers = fx.layers;
-            var newLayer = fxLayers[fx.layers.Length - 1];
-            newLayer.defaultWeight = 1f;
-
-            var newBlendTree = new BlendTree();
-            fx.CreateBlendTreeInController(layerName, out newBlendTree, fx.layers.Length - 1); //Just WTF unity, just whyyyyyyyyyy
-            newBlendTree.AddChild(clipA, 0);
-            newBlendTree.AddChild(clipB, 1);
-            newBlendTree.name = "Blend Tree";
-            newBlendTree.blendParameter = paramName;
-            newBlendTree.blendType = BlendTreeType.Simple1D;
-            newBlendTree.hideFlags = HideFlags.HideAndDontSave; //Because Unity, for some reason, doesn't want the Interface and Code to have the same defaults
-            newLayer.stateMachine.states[0].state.writeDefaultValues = false;
-            newLayer.stateMachine.states[0].position = new Vector3(250, 120); //Doesn't work for some reason?
-
-            fx.layers = fxLayers; //fixes save for default weight for some reason
-
-            EditorUtility.SetDirty(fx);
-            AssetDatabase.Refresh();
-            AssetDatabase.SaveAssets();
-        }
-
-        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
-        {
-            CreateMenuControl(vrcMenu, controlName, controlType, paramName, null, null, 1);
-        }
-        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, int value)
-        {
-            CreateMenuControl(vrcMenu, controlName, controlType, paramName, null, null, value);
-        }
-        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, Texture2D icon)
-        {
-            CreateMenuControl(vrcMenu, controlName, controlType, paramName, null, icon, 1);
-        }
-        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, VRCExpressionsMenu subMenu, Texture2D icon)
-        {
-            CreateMenuControl(vrcMenu, controlName, controlType, paramName, subMenu, icon, 1);
-        }
-
-        public void CreateMenuControl(VRCExpressionsMenu menu, string controlName, int controlType, string paramName)
-        {
-            switch (controlType)
-            {
-                case 1:
-                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.Button, paramName);
-                    break;
-                case 2:
-                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.TwoAxisPuppet, paramName);
-                    break;
-                case 3:
-                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.FourAxisPuppet, paramName);
-                    break;
-                case 4:
-                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.RadialPuppet, paramName);
-                    break;
-                default:
-                    CreateMenuControl(menu, controlName, VRCExpressionsMenu.Control.ControlType.Toggle, paramName);
-                    break;
-            }
-        }
-        private static void CreateMenuControl(VRCAvatarDescriptor vrcAvatarDescriptor, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName)
-        {
-            //var param = vrcAvatarDescriptor.expressionParameters;
-            var vrcMenu = vrcAvatarDescriptor.expressionsMenu;
-            CreateMenuControl(vrcMenu, controlName, controlType, paramName);
-        }
-
-
-        private static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, VRCExpressionsMenu subMenu, Texture2D icon, int value)
-        {
-            foreach (var control in vrcMenu.controls)
-            {
-                if (control.name.Equals(controlName))
-                {
-                    vrcMenu.controls.Remove(control); 
-                    break;
-                }
-            }
-            if (vrcMenu.controls.Count == 8)
-            {
-                EditorUtility.DisplayDialog("Menu control full!", "Free up controls or make a new one", "Ok");
-                return;
-            }
-            var item = new VRCExpressionsMenu.Control {
-                name = controlName,
-                type = controlType,
-                value = value
-            };
-            if (controlType == VRCExpressionsMenu.Control.ControlType.RadialPuppet)
-            {
-                item.subParameters = new VRCExpressionsMenu.Control.Parameter[]
-                { new  VRCExpressionsMenu.Control.Parameter {
-                    name = paramName
-                }};
-            }
-            else if (controlType == VRCExpressionsMenu.Control.ControlType.SubMenu)
-            {
-                item.subMenu = subMenu;
-            }
-            else
-            {
-                item.parameter = new VRCExpressionsMenu.Control.Parameter
-                {
-                    name = paramName
-                };
-            }
-            if (icon != null)
-            {
-                item.icon = icon;
-            }
-
-            vrcMenu.controls.Add(item);
-            EditorUtility.SetDirty(vrcMenu);
-            AssetDatabase.Refresh();
-            AssetDatabase.SaveAssets();
-        }
-
-        public static VRCExpressionsMenu CreateNewMenu(string menuName)
-        {
-            var menu = new VRCExpressionsMenu();
-            string saveFolder = GetCurrentSceneRootPath() + "/" + "Menus";
-            if (!(AssetDatabase.IsValidFolder(saveFolder)))
-                Directory.CreateDirectory(saveFolder);
-            string savePath = GetCurrentSceneRootPath() + "/" + "Menus" + "/" + menuName + ".asset";
-            menu.name = menuName;
-            AssetDatabase.CreateAsset(menu, savePath);
-            return menu;
-        }
-
-        public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType)
-        {
-            CreateVrcParameter(vrcParameters, paramName, vrcExType, 0, true); //minimum defaults
-        }
-
-        public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType, float defaultValue, bool saved)
-        {
-            
-
-            var vrcExParams = vrcParameters.parameters.ToList();
-            for (int i = 0; i < vrcParameters.parameters.Length; i++)
-            {
-                if (paramName.Equals(vrcExParams[i].name))
-                {
-                    vrcExParams.Remove(vrcExParams[i]);
-                    break;
-                }
-            }
-            var newVrcExParam = new VRCExpressionParameters.Parameter()
-            {
-                name = paramName,
-                valueType = vrcExType,
-                defaultValue = defaultValue,
-                saved = saved
-            };
-            vrcExParams.Add(newVrcExParam);
-            vrcParameters.parameters = vrcExParams.ToArray();
-
-            EditorUtility.SetDirty(vrcParameters);
-            AssetDatabase.Refresh();
-
-        }
-
-        public static VRCExpressionParameters.ValueType ConvertAnimatorToVrcParamType(AnimatorControllerParameterType dataType)
-        {
-            VRCExpressionParameters.ValueType vrcParamType;
-            switch (dataType)
-            {
-                case AnimatorControllerParameterType.Int:
-                    vrcParamType = VRCExpressionParameters.ValueType.Int;
-                    break;
-                case AnimatorControllerParameterType.Float:
-                    vrcParamType = VRCExpressionParameters.ValueType.Float;
-                    break;
-                default:
-                    vrcParamType = VRCExpressionParameters.ValueType.Bool;
-                    break;
-            }
-            return vrcParamType;
-        }
-
-        public static void CreateFxParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, int dataType)
-        {
-            if (dataType == 1)
-                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
-            else if (dataType == 2)
-                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
-            else
-                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
-        }
-
-        public static void CreateFxParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, AnimatorControllerParameterType dataType)
-        {
-            var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
-            VRCExpressionParameters.ValueType vrcParamType = ConvertAnimatorToVrcParamType(dataType);
-
-            for (int i = 0; i < fx.parameters.Length; i++)
-            {
-                if (paramName.Equals(fx.parameters[i].name))
-                    fx.RemoveParameter(i); //Remove anyway just in case theres a new datatype
-            }
-            fx.AddParameter(paramName,dataType);
-
-            CreateVrcParameter(vrcAvatarDescriptor.expressionParameters, paramName, vrcParamType);
-
-            EditorUtility.SetDirty(fx);
-            AssetDatabase.Refresh();
-        }
+        }       
 
         public void OnGUI()
         {
@@ -1092,11 +586,11 @@ namespace Shadster.AvatarTools
                     }
                     if (GUILayout.Button("Add Gogo Menu", GUILayout.Height(24)))
                     {
-                        SetupGogoLocoMenu(vrcMenu);
+                        ShadstersAvatarTools.SetupGogoLocoMenu(vrcMenu);
                     }
                     if (GUILayout.Button("Add Gogo Params", GUILayout.Height(24)))
                     {
-                        SetupGogoLocoParams(vrcParameters);
+                        ShadstersAvatarTools.SetupGogoLocoParams(vrcParameters);
                     }
 
                 }
@@ -1205,17 +699,17 @@ namespace Shadster.AvatarTools
 
                 if (GUILayout.Button("Generate Animation Render Toggles", GUILayout.Height(24)))
                 {
-                    GenerateAnimationRenderToggles(vrcAvatar);
+                    ShadstersAvatarTools.GenerateAnimationRenderToggles(vrcAvatar);
                 }
                 if (GUILayout.Button("Generate Animation Shapekeys", GUILayout.Height(24)))
                 {
                     //GenerateAnimationShapekeys(vrcAvatar);
-                    CombineAnimationShapekeys(vrcAvatar);
-                    CombineEmoteShapekeys(vrcAvatar);
+                    ShadstersAvatarTools.CombineAnimationShapekeys(vrcAvatar);
+                    ShadstersAvatarTools.CombineEmoteShapekeys(vrcAvatar);
                 }
                 if (GUILayout.Button("Generate Emote Override Menu", GUILayout.Height(24)))
                 {
-                    GenerateEmoteOverrideMenu(vrcAvatarDescriptor);
+                    ShadstersAvatarTools.GenerateEmoteOverrideMenu(vrcAvatarDescriptor);
                 }
                 using (var horizontalScope = new EditorGUILayout.HorizontalScope())
                 {
@@ -1240,18 +734,18 @@ namespace Shadster.AvatarTools
                 //vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
                 if (GUILayout.Button("Create/Overwrite Toggle FX Layer (bool)", GUILayout.Height(24)))
                 {
-                    CreateToggle(vrcAvatarDescriptor);
+                    ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, layerName, paramName, clipA, clipB);
                 }
                 if (GUILayout.Button("Create/Overwrite BlendTree FX Layer (float)", GUILayout.Height(24)))
                 {
-                    CreateBlendTree(vrcAvatarDescriptor);
+                    ShadstersAvatarTools.CreateBlendTree(vrcAvatarDescriptor, layerName, paramName, clipA, clipB);
                 }
 
                 using (var horizontalScope = new EditorGUILayout.HorizontalScope())
                 {
                     if (GUILayout.Button("Create/Overwrite Parameter", GUILayout.Height(24)))
                     {
-                        CreateFxParameter(vrcAvatarDescriptor, paramName, selectedParamType);
+                        ShadstersAvatarTools.CreateFxParameter(vrcAvatarDescriptor, paramName, selectedParamType);
                     }
                     selectedParamType = GUILayout.SelectionGrid(selectedParamType, new string[] { "bool", "int", "float" }, 3, GUILayout.Height(24));
                 }
@@ -1263,7 +757,7 @@ namespace Shadster.AvatarTools
                 }
                 if (GUILayout.Button("Create/Overwrite Menu Control", GUILayout.Height(24)))
                 {
-                    CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
+                    ShadstersAvatarTools.CreateMenuControl(vrcMenu, menuControlName, selectedControlType, paramName);
                 }
                 if (GUILayout.Button("Cleanup Unused Generated Animations", GUILayout.Height(24)))
                 {

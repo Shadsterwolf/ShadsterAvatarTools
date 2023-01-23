@@ -25,7 +25,7 @@ namespace Shadster.AvatarTools.FxSetup
         [SerializeReference] private VRCExpressionsMenu vrcMenu;
         [SerializeReference] private AnimatorController vrcFx;
 
-        private List<SkinnedMeshRenderer> _multiToggles;
+        private List<SkinnedMeshRenderer> _multiList = new List<SkinnedMeshRenderer>();
         private SkinnedMeshRenderer[] _meshRenderers;
         private bool[] _showShapekeys;
         private int[] _selectedKeys;
@@ -74,6 +74,16 @@ namespace Shadster.AvatarTools.FxSetup
             toolWindow.Show();
         }
 
+        private void OnInspectorUpdate()
+        {
+            if (vrcAvatar != null && vrcAvatarDescriptor == null) //because play mode likes to **** with me and clear the descriptor
+                vrcAvatarDescriptor = vrcAvatar.GetComponent<VRCAvatarDescriptor>();
+            if (vrcAvatar == null && vrcAvatarDescriptor == null)
+            {
+                ResetAll();
+            }
+        }
+
         public void AutoDetect()
         {
             vrcAvatarDescriptor = ShadstersAvatarTools.SelectCurrentAvatarDescriptor();
@@ -82,7 +92,7 @@ namespace Shadster.AvatarTools.FxSetup
             vrcParameters = vrcAvatarDescriptor.expressionParameters;
             vrcFx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
 
-            _meshRenderers = vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>();
+            _meshRenderers = vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             if (_showShapekeys == null || _showShapekeys.Length != _meshRenderers.Length)
             {
                 _showShapekeys = new bool[_meshRenderers.Length];
@@ -97,11 +107,12 @@ namespace Shadster.AvatarTools.FxSetup
             vrcMenu = null;
             vrcParameters = null;
             vrcFx = null;
-            _multiToggles.Clear();
+            _multiList.Clear();
         }
 
         public void DrawFxLayers()
         {
+            vrcFx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
             for (int i = 0; i < vrcFx.layers.Length; i++)
             {
                 var layer = vrcFx.layers[i];
@@ -125,12 +136,25 @@ namespace Shadster.AvatarTools.FxSetup
                 _showShapekeys[i] = EditorGUILayout.Foldout(_showShapekeys[i], _meshRenderers[i].name);
                 if (GUILayout.Button("Add Toggle", GUILayout.Width(110)))
                 {
-                    vrcFx.AddLayer(_meshRenderers[i].name + " Toggle");
+                    var clips = ShadstersAvatarTools.GenerateAnimationToggle(_meshRenderers[i], vrcAvatar);
+                    //Debug.Log(clips[0] + " " + clips[0].GetInstanceID());
+                    //Debug.Log(clips[1]);
+                    //Debug.Log(_meshRenderers[i].name + " = " + _meshRenderers[i].enabled);
+                    if (_meshRenderers[i].enabled && _meshRenderers[i].gameObject.activeInHierarchy)
+                    {
+                        ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, _meshRenderers[i].name + " Toggle", _meshRenderers[i].name, clips[1], clips[0]);
+                    }
+                    else
+                    {
+                        ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, _meshRenderers[i].name + " Toggle", _meshRenderers[i].name, clips[0], clips[1]);
+                    }
+                    ShadstersAvatarTools.CreateMenuControl(vrcAvatarDescriptor, _meshRenderers[i].name + " Toggle", VRCExpressionsMenu.Control.ControlType.Toggle, _meshRenderers[i].name);
+
                     break;
                 }
                 if (GUILayout.Button("Multi +", GUILayout.Width(110)))
                 {
-                    _multiToggles.Add(_meshRenderers[i]);
+                    _multiList.Add(_meshRenderers[i]);
                     break;
                 }
                 EditorGUILayout.EndHorizontal();
@@ -172,14 +196,45 @@ namespace Shadster.AvatarTools.FxSetup
             }
         }
 
+        public static void DrawMenuItems(VRCExpressionsMenu vrcMenu, VRCExpressionParameters vrcParameters)
+        {
+            for (int i = 0; i < vrcMenu.controls.Count; i++)
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField(vrcMenu.controls[i].name);
+                EditorGUILayout.LabelField(vrcMenu.controls[i].type.ToString(), GUILayout.Width(110));
+                EditorGUILayout.LabelField(vrcMenu.controls[i].parameter.name, GUILayout.Width(110));
+                if (GUILayout.Button("Delete"))
+                {
+                    ShadstersAvatarTools.DeleteVrcParameter(vrcParameters, vrcMenu.controls[i].parameter.name);
+                    vrcMenu.controls.RemoveAt(i);
+                    break;
+                }
+
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+
         public void DrawFxMulti()
         {
-            for (int i = 0; i < _multiToggles.Count; i++)
+            if (_multiList != null)
             {
-                var multiMesh = _multiToggles[i];
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(multiMesh.name);
-                EditorGUILayout.EndHorizontal();
+                for (int i = 0; i < _multiList.Count; i++)
+                {
+                    var multiMesh = _multiList[i];
+                    EditorGUILayout.BeginHorizontal();
+                    EditorGUILayout.LabelField(multiMesh.name);
+                    if (GUILayout.Button("Remove"))
+                    {
+                        _multiList.RemoveAt(i);
+                        break;
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+                using (new EditorGUI.DisabledScope(_multiList.Count < 2))
+                {
+                    GUILayout.Button("Create ");
+                }
             }
         }
 
@@ -209,11 +264,9 @@ namespace Shadster.AvatarTools.FxSetup
             using (new EditorGUILayout.HorizontalScope())
             {
                 vrcFx = (AnimatorController)EditorGUILayout.ObjectField(vrcFx, typeof(AnimatorController), true, GUILayout.Height(24));
-                vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
-                vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
             }
             
-            if (vrcFx != null)
+            if (vrcAvatar != null && vrcFx != null)
             {
                 if (GUILayout.Button("BackUp Current FX Controller", GUILayout.Height(24)))
                 {
@@ -225,12 +278,22 @@ namespace Shadster.AvatarTools.FxSetup
                 }
             }
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
+                vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
+            }
+            if (vrcMenu != null)
+            {
+                DrawMenuItems(vrcMenu, vrcParameters);
+            }
+            GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
             if (vrcAvatar != null)
             {
                 DrawFxObjects();
             }
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
-            if (vrcAvatar != null && _multiToggles.Count != 0)
+            if (vrcAvatar != null)
             {
                 DrawFxMulti();
             }
