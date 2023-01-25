@@ -16,8 +16,6 @@ namespace Shadster.AvatarTools.FxSetup
 
         static EditorWindow toolWindow;
         Vector2 scrollPos;
-        private bool startInSceneView;
-        private bool useExperimentalPlayMode;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
@@ -29,23 +27,6 @@ namespace Shadster.AvatarTools.FxSetup
         private SkinnedMeshRenderer[] _meshRenderers;
         private bool[] _showShapekeys;
         private int[] _selectedKeys;
-
-        [SerializeReference] private AnimationClip clipA;
-        [SerializeReference] private AnimationClip clipB;
-        [SerializeReference] private string layerName;
-        [SerializeReference] private string paramName;
-        [SerializeReference] private int selectedParamType = 0;
-        [SerializeReference] private int selectedControlType = 0;
-        [SerializeReference] private string menuControlName;
-        [SerializeReference] private bool createControlChecked;
-
-        [SerializeReference] private Transform breastBoneL;
-        [SerializeReference] private Transform breastBoneR;
-        [SerializeReference] private Transform buttBoneL;
-        [SerializeReference] private Transform buttBoneR;
-        [SerializeReference] private Transform earBoneR;
-        [SerializeReference] private Transform earBoneL;
-        [SerializeReference] private Transform tailBone;
 
         public static _FxSetupWindow ToolsWindow
         {
@@ -66,7 +47,7 @@ namespace Shadster.AvatarTools.FxSetup
         {
             if (!toolWindow)
             {
-                toolWindow = EditorWindow.GetWindow(typeof(_FxSetupWindow));
+                toolWindow = EditorWindow.GetWindow<_FxSetupWindow>();
                 toolWindow.autoRepaintOnSceneChange = true;
                 toolWindow.titleContent = new GUIContent("FX Setup");
                 toolWindow.minSize = new Vector2(500, 800);

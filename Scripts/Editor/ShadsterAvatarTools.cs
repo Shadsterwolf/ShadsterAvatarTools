@@ -14,7 +14,6 @@ using Thry;
 using VRC.Core;
 using VRC.SDKBase;
 using VRC.SDK3.Avatars.Components;
-//using VRC_AvatarDescriptor = VRC.SDK3.Avatars.Components.VRCAvatarDescriptor;
 using VRC_SpatialAudioSource = VRC.SDK3.Avatars.Components.VRCSpatialAudioSource;
 using VRC_PhysBone = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone;
 using VRC_PhysCollider = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneCollider;
@@ -228,6 +227,10 @@ namespace Shadster.AvatarTools
                 {
                     copyPBone.rootTransform = pBone.transform;
                 }
+                else
+                {
+                    copyPBone.name = pBone.rootTransform.name;
+                }
                 DestroyImmediate(pBone);
             }
         }
@@ -258,6 +261,10 @@ namespace Shadster.AvatarTools
                 if (pCollider.rootTransform == null)
                 {
                     copyPCollider.rootTransform = pCollider.transform;
+                }
+                else
+                {
+                    copyPCollider.name = pCollider.rootTransform.name;
                 }
 
                 foreach (var pBone in physbones) //Move all possible colliders from physbones
@@ -878,7 +885,384 @@ namespace Shadster.AvatarTools
             CreateMenuControl(vrcMenu, "GoGo Loco Menu", VRCExpressionsMenu.Control.ControlType.SubMenu, "", subMenu, icon);
         }
 
+        public static AnimationCurve LinearAnimationCurve()
+        {
+            AnimationCurve curve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0.5f));
+            curve.preWrapMode = WrapMode.Default;
+            curve.postWrapMode = WrapMode.Default;
 
+            return curve;
+        }
+
+        public static void AddPhysBones(Transform bone)
+        {
+            if (!ShadstersAvatarTools.BoneHasPhysBones(bone))
+            {
+                VRC_PhysBone pBone = bone.gameObject.AddComponent<VRC_PhysBone>();
+                pBone.rootTransform = bone;
+                pBone.integrationType = VRC_PhysBone.IntegrationType.Advanced;
+                pBone.pull = 0.2f;
+                //pBone.pullCurve = LinearAnimationCurve();
+                pBone.spring = 0.8f;
+                pBone.stiffness = 0.2f;
+                pBone.immobile = 0.3f;
+
+                pBone.limitType = VRC_PhysBone.LimitType.Angle;
+                pBone.maxAngleX = 45;
+            }
+        }
+
+        public static void AddButtPhysBones(Transform bone)
+        {
+            if (!ShadstersAvatarTools.BoneHasPhysBones(bone))
+            {
+                VRC_PhysBone pBone = bone.gameObject.AddComponent<VRC_PhysBone>();
+                pBone.rootTransform = bone;
+                pBone.integrationType = VRC_PhysBone.IntegrationType.Advanced;
+                pBone.pull = 0.2f;
+                //pBone.pullCurve = LinearAnimationCurve();
+                pBone.spring = 0.8f;
+                pBone.stiffness = 0.2f;
+                pBone.immobile = 0.3f;
+
+                pBone.limitType = VRC_PhysBone.LimitType.Angle;
+                pBone.maxAngleX = 45;
+            }
+        }
+
+        public static void UseExperimentalPlayMode(bool value)
+        {
+            const string EditorSettingsAssetPath = "ProjectSettings/EditorSettings.asset";
+            SerializedObject editorSettings = new SerializedObject(UnityEditor.AssetDatabase.LoadAllAssetsAtPath(EditorSettingsAssetPath)[0]);
+            SerializedProperty m_playMode = editorSettings.FindProperty("m_EnterPlayModeOptionsEnabled");
+            SerializedProperty m_playModeOptions = editorSettings.FindProperty("m_EnterPlayModeOptions");
+            if (value)
+            {
+                m_playMode.boolValue = true;
+                m_playModeOptions.intValue = 1; //0 = all checked, 1 = scene only, 2 = domain only, 3 = none?
+            }
+            else
+            {
+                m_playMode.boolValue = false;
+                m_playModeOptions.intValue = 3;
+            }
+            editorSettings.ApplyModifiedProperties();
+        }
+        public static List<SkinnedMeshRenderer> GetAvatarSkinnedMeshRenderers(GameObject root, Bounds bounds)
+        {
+            List<SkinnedMeshRenderer> smrList = null;
+            Debug.Log(root.GetComponentsInChildren<Renderer>()[1]);
+            foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                //Debug.Log(smr);
+                //Debug.Log(smr.bounds);
+                //smrList.Add(smr);
+            }
+
+            return smrList;
+        }
+
+        public static Bounds CalculateLocalBounds(GameObject root)
+        {
+            //Vector3 extentTotal;
+            //extentTotal.x = 0f;
+            //extentTotal.y = 0f;
+            //extentTotal.z = 0f;
+
+            Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+
+            foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>())
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+            //bounds.extents = extentTotal;
+            return bounds;
+        }
+
+        public static void EncapsulateAvatarBounds(GameObject vrcAvatar)
+        {
+            Undo.RecordObject(vrcAvatar, "Combine Mesh Bounds");
+            Bounds bounds = CalculateLocalBounds(vrcAvatar);
+            foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                smr.localBounds = bounds;
+            }
+
+        }
+
+        public static void ResetAvatarBounds(GameObject vrcAvatar)
+        {
+            foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                smr.sharedMesh.RecalculateBounds();
+            }
+
+        }
+
+        public static void OverrideAvatarBounds(GameObject vrcAvatar)
+        {
+            Vector3 vectorSize;
+            vectorSize.x = 2.5f;
+            vectorSize.y = 2.5f;
+            vectorSize.z = 2.5f;
+            Bounds bounds = new Bounds(Vector3.zero, vectorSize);
+            foreach (SkinnedMeshRenderer smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                Undo.RecordObject(smr, "Set Avatar Bounds");
+                smr.localBounds = bounds;
+            }
+        }
+        public static void OverrideAvatarAnchorProbes(GameObject vrcAvatar)
+        {
+
+            foreach (Renderer r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
+            {
+                Undo.RecordObject(r, "Set Avatar Anchor Probe");
+                r.probeAnchor = vrcAvatar.transform.Find("Armature").Find("Hips");
+            }
+        }
+
+        public static bool GogoLocoExist()
+        {
+            if (!(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID("Assets/GoGo/Loco/GoControllers/GoLocoBase.controller"))))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static void SetupGogoLocoLayers(VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            vrcAvatarDescriptor.customizeAnimationLayers = true; //ensure customizing playable layers is true
+            vrcAvatarDescriptor.autoLocomotion = false; //disable force 6-point tracking
+
+            vrcAvatarDescriptor.baseAnimationLayers[0].isDefault = false; //Base
+            vrcAvatarDescriptor.baseAnimationLayers[3].isDefault = false; //Action
+            vrcAvatarDescriptor.specialAnimationLayers[0].isDefault = false; //Sitting
+
+            vrcAvatarDescriptor.baseAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoBase.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[3].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoAction.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.specialAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoSitting.controller", typeof(RuntimeAnimatorController));
+            //Debug.Log(AssetDatabase.GetAssetPath(vrcAvatarDescriptor.specialAnimationLayers[0].animatorController));
+        }
+
+        public static float GetAvatarHeight(GameObject vrcAvatar)
+        {
+            Animator anim = vrcAvatar.GetComponent<Animator>();
+            Transform shoulderL = anim.GetBoneTransform(HumanBodyBones.LeftShoulder);
+            float height = shoulderL.position.y - vrcAvatar.transform.position.y;
+            Debug.Log(height);
+            return height;
+        }
+
+        public static Transform GetAvatarBone(GameObject vrcAvatar, string search, string direction)
+        {
+            Transform armature = vrcAvatar.transform.Find("Armature");
+            Transform result = null;
+            if (armature != null)
+            {
+                foreach (Transform bone in armature.GetComponentsInChildren<Transform>(true))
+                {
+                    if (bone.name.Contains(search))
+                    {
+                        if (result == null && bone.name.Contains(direction))
+                        {
+                            result = bone;
+                        }
+                    }
+
+
+                }
+            }
+            //Debug.Log(result);
+            return result;
+        }
+
+        public static void DeleteEndBones(GameObject vrcAvatar)
+        {
+            Transform armature = vrcAvatar.transform.Find("Armature");
+            if (armature != null)
+            {
+                foreach (Transform bone in armature.GetComponentsInChildren<Transform>(true))
+                {
+                    if (bone.name.EndsWith("_end"))
+                    {
+                        Undo.RecordObject(bone, "Delete End Bone");
+                        DestroyImmediate(bone.gameObject);
+                    }
+                }
+            }
+        }
+
+
+        public static void SaveAvatarPrefab(GameObject vrcAvatar)
+        {
+            string prefabPath = GetCurrentSceneRootPath() + "/Prefabs";
+            if (!(AssetDatabase.IsValidFolder(prefabPath))) //If folder doesn't exist "Assets\AvatarName\Prefabs"
+            {
+                Directory.CreateDirectory(prefabPath);
+            }
+            string savePath = prefabPath + "/" + vrcAvatar.name + ".prefab";
+            PrefabUtility.SaveAsPrefabAsset(vrcAvatar, savePath);
+        }
+
+        public static List<UnityEngine.Object> GetAvatarTextures(GameObject vrcAvatar)
+        {
+            List<UnityEngine.Object> aTextures = new List<UnityEngine.Object>();
+            List<string> extensions = new List<string>(new string[] { ".bmp", ".exr", ".gif", ".hdr", ".iff", ".jpg", ".pict", ".png", ".psd", ".tga", ".tiff" });
+            foreach (Renderer r in vrcAvatar.GetComponentsInChildren<Renderer>(true))
+            {
+                foreach (Material m in r.sharedMaterials)
+                {
+                    if (!m)
+                        continue;
+                    int[] texIDs = m.GetTexturePropertyNameIDs();
+                    if (texIDs == null)
+                        continue;
+                    foreach (int i in texIDs)
+                    {
+                        Texture t = m.GetTexture(i);
+                        if (!t)
+                            continue;
+                        string path = AssetDatabase.GetAssetPath(t);
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            if (extensions.Any(s => path.Contains(s))) //check if actual texture file
+                            {
+                                //Debug.Log(path);
+                                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                                aTextures.Add(importer);
+                            }
+                        }
+
+                    }
+                }
+            }
+            aTextures = aTextures.Distinct().ToList(); //Clear duplicates
+            return aTextures;
+        }
+
+        public static void UncheckAvatarTextureMipMaps(GameObject vrcAvatar)
+        {
+            List<string> paths = new List<string>();
+            List<UnityEngine.Object> aTextures = GetAvatarTextures(vrcAvatar);
+            if (aTextures.Count > 0)
+            {
+                foreach (UnityEngine.Object o in aTextures)
+                {
+                    TextureImporter t = (TextureImporter)o;
+                    if (t.mipmapEnabled)
+                    {
+                        Undo.RecordObject(t, "Un-Generate Mip Maps");
+                        t.mipmapEnabled = false;
+                        EditorUtility.SetDirty(t);
+                        paths.Add(t.assetPath);
+                    }
+                }
+            }
+            if (paths.Count > 0)
+            {
+                AssetDatabase.ForceReserializeAssets(paths);
+                AssetDatabase.Refresh();
+            }
+        }
+
+        public static void SetAvatarTexturesMaxSize(GameObject vrcAvatar, int maxSize)
+        {
+            List<string> paths = new List<string>();
+            List<UnityEngine.Object> aTextures = GetAvatarTextures(vrcAvatar);
+            if (aTextures.Count > 0)
+            {
+                Debug.Log(aTextures.Count);
+                foreach (UnityEngine.Object o in aTextures)
+                {
+                    Debug.Log(o);
+                    TextureImporter t = (TextureImporter)o;
+                    if (t.maxTextureSize != maxSize)
+                    {
+                        Undo.RecordObject(t, "Set Textures size to 4k");
+                        t.maxTextureSize = maxSize;
+                        EditorUtility.SetDirty(t);
+                        paths.Add(t.assetPath);
+                    }
+                }
+            }
+            if (paths.Count > 0)
+            {
+                AssetDatabase.ForceReserializeAssets(paths);
+                AssetDatabase.Refresh();
+            }
+        }
+
+        public static void SetAllGrabMovement(GameObject vrcAvatar)
+        {
+            List<VRC_PhysBone> pBones = GetAllAvatarPhysBones(vrcAvatar);
+            if (pBones.Count > 0)
+            {
+                foreach (var pBone in pBones)
+                {
+                    Undo.RecordObject(pBone, "Set Avatar PhysBone Grab Movement");
+                    pBone.grabMovement = 1;
+                }
+            }
+        }
+
+        public static void UncheckAllWriteDefaults(VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            var baseAnimations = vrcAvatarDescriptor.baseAnimationLayers;
+            var specialAnimations = vrcAvatarDescriptor.specialAnimationLayers;
+            var aControllers = baseAnimations.Concat(specialAnimations);
+            foreach (var aController in aControllers)
+            {
+                if (aController.isDefault == false)
+                {
+                    //Debug.Log(aController.animatorController);
+                    var controller = aController.animatorController as UnityEditor.Animations.AnimatorController;
+                    foreach (var cLayer in controller.layers)
+                    {
+                        //Debug.Log(cLayer.stateMachine);
+                        var cStates = cLayer.stateMachine.states;
+                        //Debug.Log(cLayer.stateMachine.stateMachines);
+                        foreach (var cState in cStates)
+                        {
+                            //Debug.Log(cState.state);
+                            if (cState.state.writeDefaultValues)
+                            {
+                                cState.state.writeDefaultValues = false;
+                                Debug.Log("Unchecked Write Defaults for: " + cState.state);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        public static void RepairMissingPhysboneTransforms(GameObject vrcAvatar)
+        {
+            Transform pTransform = vrcAvatar.transform.Find("PhysBones");
+            if (pTransform != null)
+            {
+                foreach (VRCPhysBone pBone in pTransform.GetComponentsInChildren<VRCPhysBone>(true))
+                {
+                    RepairMissingPhysboneTransform(vrcAvatar, pBone);
+                }
+            }
+        }
+
+        public static void RepairMissingPhysboneTransform(GameObject vrcAvatar, VRCPhysBone pBone)
+        {
+            Transform armature = vrcAvatar.transform.Find("Armature");
+            if (armature != null)
+            {
+                foreach (Transform bone in armature.GetComponentsInChildren<Transform>(true))
+                {
+                    if (pBone.rootTransform == null && pBone.name == bone.name)
+                    {
+                        pBone.rootTransform = bone;
+                    }
+                }
+            }
+        }
 
     }
 }
