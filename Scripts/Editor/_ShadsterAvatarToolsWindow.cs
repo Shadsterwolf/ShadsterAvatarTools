@@ -18,6 +18,7 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
         private bool startInSceneView;
         private bool useExperimentalPlayMode;
         private bool ignorePhysImmobile;
+        private bool testPhysbones;
 
         [SerializeReference] private VRCAvatarDescriptor vrcAvatarDescriptor;
         [SerializeReference] private GameObject vrcAvatar;
@@ -111,6 +112,16 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
             breastBoneR = ShadstersAvatarTools.GetAvatarBone(vrcAvatar, "Breast", "_R");
             buttBoneL = ShadstersAvatarTools.GetAvatarBone(vrcAvatar, "Butt", "_L");
             buttBoneR = ShadstersAvatarTools.GetAvatarBone(vrcAvatar, "Butt", "_R");
+        }
+
+        public bool Prompt(string banner)
+        {
+            bool result = EditorUtility.DisplayDialog(banner, "Are you sure?", "Yes", "No");
+            if (result)
+            {
+                return true;
+            }
+            return false;
         }
 
 
@@ -262,7 +273,17 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                     }
                     if (GUILayout.Button("Cleanup Unused Generated Animations", GUILayout.Height(24)))
                     {
-                        ShadstersAvatarTools.CleanupUnusedGeneratedAnimations();
+                        if (Prompt("Cleanup Unused Generated Animations"))
+                        {
+                            ShadstersAvatarTools.CleanupUnusedGeneratedAnimations();
+                        }
+                    }
+                    if (GUILayout.Button("Uncheck All Write Defaults states", GUILayout.Height(24)))
+                    {
+                        if (Prompt("Uncheck All Write Defaults states"))
+                        {
+                            ShadstersAvatarTools.UncheckAllWriteDefaults(vrcAvatarDescriptor);
+                        }
                     }
                     GUI.backgroundColor = currentBackgroundColor;
                 }
@@ -301,7 +322,7 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                var sceneToggleState = GUILayout.Toggle(startInSceneView, new GUIContent("Start Play Mode in Scene View", "Loads prefab that will start play mode to Scene view instead of starting in Game View"), GUILayout.Height(24));
+                var sceneToggleState = GUILayout.Toggle(startInSceneView, new GUIContent("Start Play Mode in Scene View", "Loads prefab that will start play mode to Scene view instead of starting in Game View"), GUILayout.Height(24), GUILayout.Width(250));
                 if (sceneToggleState != startInSceneView)
                 {
                     ShadstersAvatarTools.SetStartPlayModeInSceneView(sceneToggleState);
@@ -317,6 +338,12 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
             }
             using (new EditorGUILayout.HorizontalScope())
             {
+                var testPhysbonesState = GUILayout.Toggle(testPhysbones, new GUIContent("Test All Avatar Physbones", "When in Play Mode, automatically moves the avatar to check behaviour of physbones"), GUILayout.Height(24), GUILayout.Width(250));
+                if (testPhysbonesState != testPhysbones)
+                {
+                    ShadstersAvatarTools.SetTestPhysbones(testPhysbonesState);
+                    testPhysbones = ShadstersAvatarTools.GetTestPhysbones();
+                }
                 var ignorePhysToggleState = GUILayout.Toggle(ignorePhysImmobile, new GUIContent("Ignore Physbone Immobile World", "When in Play Mode, updates all physbones with Immobile World Type to zero"), GUILayout.Height(24));
                 if (ignorePhysToggleState != ignorePhysImmobile)
                 {
@@ -395,10 +422,24 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                         ShadstersAvatarTools.SetAvatarTexturesMaxSize(vrcAvatar, 4096);
                     }
                 }
-                if (GUILayout.Button("Uncheck All Write Defaults states", GUILayout.Height(24)))
+
+                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
                 {
-                    ShadstersAvatarTools.UncheckAllWriteDefaults(vrcAvatarDescriptor);
+                    if (GUILayout.Button("Set Compression Low", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.CompressedLQ);
+                    }
+                    if (GUILayout.Button("Set Compression Normal", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.Compressed);
+                    }
+                    if (GUILayout.Button("Set Compression High", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.CompressedHQ);
+                    }
+
                 }
+                
                 
 
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------

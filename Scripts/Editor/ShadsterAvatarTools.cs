@@ -9,7 +9,6 @@ using UnityEngine.UI;
 using UnityEditor.Animations;
 using Codice.CM.Common.Zlib;
 using VRC.SDK3.Avatars.ScriptableObjects;
-using Thry;
 #if VRC_SDK_VRCSDK3 && !UDON
 using VRC.Core;
 using VRC.SDKBase;
@@ -28,6 +27,7 @@ namespace Shadster.AvatarTools
     {
         private static GameObject startInSceneViewPrefab;
         private static GameObject ignorePhysImmobilePrefab;
+        private static GameObject testPhysbonesPrefab;
 
         public static bool GetStartPlayModeInSceneView()
         {
@@ -75,6 +75,30 @@ namespace Shadster.AvatarTools
                 ignorePhysImmobilePrefab = Instantiate(prefab);
             else
                 DestroyImmediate(ignorePhysImmobilePrefab, true);
+        }
+
+        public static bool GetTestPhysbones()
+        {
+            if (testPhysbonesPrefab != null)
+            {
+                return true;
+            }
+            if (GameObject.Find("TestPhysbones(Clone)") != null)
+            {
+                testPhysbonesPrefab = GameObject.Find("TestPhysbones(Clone)");
+                return true;
+            }
+            return false;
+        }
+
+        public static void SetTestPhysbones(bool flag)
+        {
+            //var prefabPath = AssetDatabase.GUIDToAssetPath("38bc44479eca0c9409fb9a16a3a9a873");
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/ShadstersAvatarTools/Prefabs/TestPhysbones.prefab");
+            if (flag)
+                testPhysbonesPrefab = Instantiate(prefab);
+            else
+                DestroyImmediate(testPhysbonesPrefab, true);
         }
 
         public static VRCAvatarDescriptor SelectCurrentAvatarDescriptor()
@@ -723,10 +747,10 @@ namespace Shadster.AvatarTools
                 var emoteFiles = dir.GetFiles("*.anim");
                 string paramName = "EmoteOverride";
                 string layerName = "Emote Override Control";
-                ShadstersAvatarTools.CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
+                CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Int);
                 var menu = CreateNewMenu("Menu_EmoteOverride");
-                var fx = ShadstersAvatarTools.GetFxController(vrcAvatarDescriptor);
-                ShadstersAvatarTools.DeleteExistingFxLayer(fx, layerName);
+                var fx = GetFxController(vrcAvatarDescriptor);
+                DeleteExistingFxLayer(fx, layerName);
                 fx.AddLayer(layerName);
                 var fxLayers = fx.layers;
                 var newLayer = fxLayers[fx.layers.Length - 1];
@@ -734,7 +758,9 @@ namespace Shadster.AvatarTools
                 var emptyState = newLayer.stateMachine.AddState("Empty", new Vector3(250, 220));
                 emptyState.writeDefaultValues = true; //Reset defaults as we don't want to override anymore
                 EditorUtility.SetDirty(emptyState);
-                for (int i = 0; i < emoteFiles.Length; i++)
+                int emoteCount = emoteFiles.Length;
+                if (emoteCount > 8) { emoteCount = 8; }
+                for (int i = 0; i < emoteCount; i++)
                 {
                     var emoteAsset = "Assets" + emoteFiles[i].FullName.Substring(Application.dataPath.Length);
                     var emote = AssetDatabase.LoadAssetAtPath(emoteAsset, typeof(AnimationClip)) as AnimationClip;
@@ -762,8 +788,6 @@ namespace Shadster.AvatarTools
                     CreateMenuControl(menu, emote.name, VRCExpressionsMenu.Control.ControlType.Toggle, paramName, i + 1);
                 }
                 fx.layers = fxLayers; //fixes save for default weight for some reason
-
-
                 //EditorUtility.SetDirty(fx);
                 //AssetDatabase.Refresh();
                 AssetDatabase.SaveAssets();
@@ -1173,15 +1197,42 @@ namespace Shadster.AvatarTools
             List<UnityEngine.Object> aTextures = GetAvatarTextures(vrcAvatar);
             if (aTextures.Count > 0)
             {
-                Debug.Log(aTextures.Count);
+                //Debug.Log(aTextures.Count);
                 foreach (UnityEngine.Object o in aTextures)
                 {
-                    Debug.Log(o);
+                    //Debug.Log(o);
                     TextureImporter t = (TextureImporter)o;
                     if (t.maxTextureSize != maxSize)
                     {
-                        Undo.RecordObject(t, "Set Textures size to 4k");
+                        Undo.RecordObject(t, "Set Textures size to " + maxSize.ToString());
                         t.maxTextureSize = maxSize;
+                        EditorUtility.SetDirty(t);
+                        paths.Add(t.assetPath);
+                    }
+                }
+            }
+            if (paths.Count > 0)
+            {
+                AssetDatabase.ForceReserializeAssets(paths);
+                AssetDatabase.Refresh();
+            }
+        }
+
+        public static void SetAvatarTexturesCompression(GameObject vrcAvatar, TextureImporterCompression compressionType)
+        {
+            List<string> paths = new List<string>();
+            List<UnityEngine.Object> aTextures = GetAvatarTextures(vrcAvatar);
+            if (aTextures.Count > 0)
+            {
+                //Debug.Log(aTextures.Count);
+                foreach (UnityEngine.Object o in aTextures)
+                {
+                    //Debug.Log(o);
+                    TextureImporter t = (TextureImporter)o;
+                    if (t.textureCompression != compressionType)
+                    {
+                        Undo.RecordObject(t, "Set Avatar compression");
+                        t.textureCompression = compressionType;
                         EditorUtility.SetDirty(t);
                         paths.Add(t.assetPath);
                     }
