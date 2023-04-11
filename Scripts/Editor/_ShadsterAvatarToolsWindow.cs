@@ -3,6 +3,7 @@ using Shadster.AvatarTools;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Avatars.ScriptableObjects;
 
@@ -37,6 +38,8 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
 
         [SerializeReference] private bool bonesFoldView;
         [SerializeReference] private bool animationFoldView;
+        [SerializeReference] private bool texturesFoldView;
+        [SerializeReference] private bool scenesFoldView;
 
         [SerializeReference] private Transform breastBoneL;
         [SerializeReference] private Transform breastBoneR;
@@ -178,6 +181,10 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                     {
                         ShadstersAvatarTools.SetAllGrabMovement(vrcAvatar);
                     }
+                    if (GUILayout.Button("Delete End Bones", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.DeleteEndBones(vrcAvatar);
+                    }
                     if (GUILayout.Button("Repair Missing PhysBone Transforms", GUILayout.Height(24)))
                     {
                         ShadstersAvatarTools.RepairMissingPhysboneTransforms(vrcAvatar);
@@ -218,6 +225,11 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                         //GenerateAnimationShapekeys(vrcAvatar);
                         ShadstersAvatarTools.CombineAnimationShapekeys(vrcAvatar);
                         ShadstersAvatarTools.CombineEmoteShapekeys(vrcAvatar);
+                    }
+                    if (GUILayout.Button("Generate Animation Poi Hues", GUILayout.Height(24)))
+                    {
+                        //GenerateAnimationShapekeys(vrcAvatar);
+                        ShadstersAvatarTools.GenerateAnimationHueShaders(vrcAvatar);
                     }
                     if (GUILayout.Button("Generate Emote Override Menu", GUILayout.Height(24)))
                     {
@@ -289,6 +301,126 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                 }
                 EditorGUILayout.EndVertical();
             }
+        } //End Animation Foldout
+
+        public void DrawTexturesWindow()
+        {
+            using (new EditorGUILayout.VerticalScope())
+            {
+                Rect subBoxRect = EditorGUILayout.BeginVertical();
+                subBoxRect.x += 4;
+                subBoxRect.width -= 4;
+                subBoxRect.height += 2;
+                Color currentColor = GUI.color;
+                GUI.color = new Color(1f, 0.4f, 0.4f);
+                GUI.Box(subBoxRect, "");
+
+                GUI.color = currentColor;
+                texturesFoldView = EditorGUILayout.Foldout(texturesFoldView, "Textures");
+                if (texturesFoldView)
+                {
+
+                    Color currentBackgroundColor = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(1.6f, 0.6f, 0.6f);
+
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("Enable All Mip Maps", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.UpdateAvatarTextureMipMaps(vrcAvatar, true);
+                        }
+                        if (GUILayout.Button("Disable All Mip Maps", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.UpdateAvatarTextureMipMaps(vrcAvatar, false);
+                        }
+                    }
+                    using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("Set All Max Size 1k", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.SetAvatarTexturesMaxSize(vrcAvatar, 1024);
+                        }
+                        if (GUILayout.Button("Set All Max Size 2k", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.SetAvatarTexturesMaxSize(vrcAvatar, 2048);
+                        }
+                        if (GUILayout.Button("Set All Max Size 4k", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.SetAvatarTexturesMaxSize(vrcAvatar, 4096);
+                        }
+                    }
+
+                    using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("Set Compression LQ", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.CompressedLQ);
+                        }
+                        if (GUILayout.Button("Set Compression NQ", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.Compressed);
+                        }
+                        if (GUILayout.Button("Set Compression HQ", GUILayout.Height(24)))
+                        {
+                            ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.CompressedHQ);
+                        }
+
+                    }
+                    GUI.backgroundColor = currentBackgroundColor;
+                }
+                EditorGUILayout.EndVertical();
+            }
+        }
+
+        public void DrawScenesWindow()
+        {
+            using (new EditorGUILayout.VerticalScope())
+            {
+                Rect subBoxRect = EditorGUILayout.BeginVertical();
+                subBoxRect.x += 4;
+                subBoxRect.width -= 4;
+                subBoxRect.height += 2;
+                Color currentColor = GUI.color;
+                GUI.color = new Color(0.2f, 0.2f, 0.2f);
+                GUI.Box(subBoxRect, "");
+
+                GUI.color = currentColor;
+                scenesFoldView = EditorGUILayout.Foldout(scenesFoldView, "Scenes");
+                if (scenesFoldView)
+                {
+                    Color currentBackgroundColor = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f);
+
+                    string originalScenePath = SceneManager.GetActiveScene().path;
+                    string context = originalScenePath.Substring(0, originalScenePath.LastIndexOf("/"));
+                    GUIStyle boldCenteredStyle = new GUIStyle(GUI.skin.label);
+                    boldCenteredStyle.alignment = TextAnchor.MiddleCenter;
+                    boldCenteredStyle.fontStyle = FontStyle.Bold;
+
+                    GUILayout.Label(context, boldCenteredStyle);
+                    if (GUILayout.Button("Cleanup All Related Scenes", GUILayout.Height(24)))
+                    {
+                        if (Prompt("Cleanup All Related Scenes"))
+                        {
+                            ShadstersAvatarTools.CleanUp();
+                        }
+                    }
+                    if (GUILayout.Button("Cleanup + Fix All Related Scenes", GUILayout.Height(24)))
+                    {
+                        if (Prompt("Cleanup + Fix All Related Scenes"))
+                        {
+                            ShadstersAvatarTools.CleanUp(true);
+                        }
+                    }
+                    if (GUILayout.Button("Export Current Context Folder", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.Export();
+                    }
+
+                    GUI.backgroundColor = currentBackgroundColor;
+                }
+                EditorGUILayout.EndVertical();
+            }
         }
 
         public void OnGUI()
@@ -355,50 +487,18 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
             using (new EditorGUI.DisabledScope(vrcAvatarDescriptor == null))
             {
-                using (new EditorGUI.DisabledScope(!ShadstersAvatarTools.GogoLocoExist()))
+                if (GUILayout.Button("Fix Avatar Descriptor (Missing Face/Body)", GUILayout.Height(24)))
                 {
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        if (GUILayout.Button("Setup Gogo Layers", GUILayout.Height(24)))
-                        {
-                            ShadstersAvatarTools.SetupGogoLocoLayers(vrcAvatarDescriptor);
-                        }
-                        if (GUILayout.Button("Add Gogo Menu", GUILayout.Height(24)))
-                        {
-                            ShadstersAvatarTools.SetupGogoLocoMenu(vrcMenu);
-                        }
-                        if (GUILayout.Button("Add Gogo Params", GUILayout.Height(24)))
-                        {
-                            ShadstersAvatarTools.SetupGogoLocoParams(vrcParameters);
-                        }
-
-                    }
+                    ShadstersAvatarTools.FixAvatarDescriptor(vrcAvatarDescriptor);
                 }
-
-                GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
-                if (GUILayout.Button("Delete End Bones", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.DeleteEndBones(vrcAvatar);
-                }
-                //if (GUILayout.Button("Combine Mesh Bounds", GUILayout.Height(24)))
-                //{
-                //    EncapsulateAvatarBounds(vrcAvatar);
-                //}
-
                 if (GUILayout.Button("Set All Mesh Bounds to 2.5sq", GUILayout.Height(24)))
                 {
-                    ShadstersAvatarTools.OverrideAvatarBounds(vrcAvatar);
+                    ShadstersAvatarTools.SetAvatarMeshBounds(vrcAvatar);
                 }
                 if (GUILayout.Button("Set All Anchor Probes to Hip", GUILayout.Height(24)))
                 {
-                    ShadstersAvatarTools.OverrideAvatarAnchorProbes(vrcAvatar);
-                }
-
-                //if (GUILayout.Button("Reset Mesh Bounds", GUILayout.Height(24)))
-                //{
-                //    ResetAvatarBounds(vrcAvatar);
-                //}
-                
+                    ShadstersAvatarTools.SetAvatarAnchorProbes(vrcAvatar);
+                }                
                 if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
                 {
                     ShadstersAvatarTools.ClearAvatarBlueprintID(vrcAvatar);
@@ -407,54 +507,19 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                 {
                     ShadstersAvatarTools.SaveAvatarPrefab(vrcAvatar);
                 }
-                if (GUILayout.Button("Uncheck All Texture Mip Maps", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.UncheckAvatarTextureMipMaps(vrcAvatar);
-                }
-                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-                {
-                    if (GUILayout.Button("Set Textures Max Size 2k", GUILayout.Height(24)))
-                    {
-                        ShadstersAvatarTools.SetAvatarTexturesMaxSize(vrcAvatar, 2048);
-                    }
-                    if (GUILayout.Button("Set Textures Max Size 4k", GUILayout.Height(24)))
-                    {
-                        ShadstersAvatarTools.SetAvatarTexturesMaxSize(vrcAvatar, 4096);
-                    }
-                }
 
-                using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-                {
-                    if (GUILayout.Button("Set Compression Low", GUILayout.Height(24)))
-                    {
-                        ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.CompressedLQ);
-                    }
-                    if (GUILayout.Button("Set Compression Normal", GUILayout.Height(24)))
-                    {
-                        ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.Compressed);
-                    }
-                    if (GUILayout.Button("Set Compression High", GUILayout.Height(24)))
-                    {
-                        ShadstersAvatarTools.SetAvatarTexturesCompression(vrcAvatar, TextureImporterCompression.CompressedHQ);
-                    }
 
-                }
-                
-                
-
+                GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
+                DrawTexturesWindow();
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
                 DrawBonesWindow();
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
                 DrawAnimationFoldout();
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
 
-                if (GUILayout.Button("Cleanup Avatar & Export from current scene", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.Export();
-                }
-                
-
             } // Using Disable Scope
+            DrawScenesWindow();
+
             EditorGUILayout.EndScrollView();
         } // GUI
     }

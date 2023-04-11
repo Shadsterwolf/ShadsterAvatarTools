@@ -22,6 +22,7 @@ namespace Shadster.AvatarTools.FxSetup
         [SerializeReference] private VRCExpressionParameters vrcParameters;
         [SerializeReference] private VRCExpressionsMenu vrcMenu;
         [SerializeReference] private AnimatorController vrcFx;
+        [SerializeReference] private GameObject tempObject;
 
         private List<SkinnedMeshRenderer> _multiList = new List<SkinnedMeshRenderer>();
         private SkinnedMeshRenderer[] _meshRenderers;
@@ -99,7 +100,7 @@ namespace Shadster.AvatarTools.FxSetup
                 var layer = vrcFx.layers[i];
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField(layer.name);
-                if (GUILayout.Button("Delete"))
+                if (GUILayout.Button("Delete", GUILayout.Width(110)))
                 {
                     vrcFx.RemoveLayer(i);
                     //vrcFx.AddLayer("New Layer");
@@ -133,10 +134,13 @@ namespace Shadster.AvatarTools.FxSetup
 
                     break;
                 }
-                if (GUILayout.Button("Multi +", GUILayout.Width(110)))
+                using (new EditorGUI.DisabledScope(true))
                 {
-                    _multiList.Add(_meshRenderers[i]);
-                    break;
+                    if (GUILayout.Button("Multi + TBD", GUILayout.Width(110)))
+                    {
+                        _multiList.Add(_meshRenderers[i]);
+                        break;
+                    }
                 }
                 EditorGUILayout.EndHorizontal();
 
@@ -181,18 +185,19 @@ namespace Shadster.AvatarTools.FxSetup
         {
             for (int i = 0; i < vrcMenu.controls.Count; i++)
             {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(vrcMenu.controls[i].name);
-                EditorGUILayout.LabelField(vrcMenu.controls[i].type.ToString(), GUILayout.Width(110));
-                EditorGUILayout.LabelField(vrcMenu.controls[i].parameter.name, GUILayout.Width(110));
-                if (GUILayout.Button("Delete"))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    ShadstersAvatarTools.DeleteVrcParameter(vrcParameters, vrcMenu.controls[i].parameter.name);
-                    vrcMenu.controls.RemoveAt(i);
-                    break;
+                    EditorGUILayout.LabelField(vrcMenu.controls[i].name, GUILayout.Width(110));
+                    EditorGUILayout.LabelField(vrcMenu.controls[i].type.ToString(), GUILayout.Width(110));
+                    EditorGUILayout.LabelField(vrcMenu.controls[i].parameter.name, GUILayout.Width(110));
+                    GUILayout.FlexibleSpace();
+                    if (GUILayout.Button("Delete", GUILayout.Width(110)))
+                    {
+                        ShadstersAvatarTools.DeleteVrcParameter(vrcParameters, vrcMenu.controls[i].parameter.name);
+                        vrcMenu.controls.RemoveAt(i);
+                        break;
+                    }
                 }
-
-                EditorGUILayout.EndHorizontal();
             }
         }
 
@@ -205,7 +210,7 @@ namespace Shadster.AvatarTools.FxSetup
                     var multiMesh = _multiList[i];
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField(multiMesh.name);
-                    if (GUILayout.Button("Remove"))
+                    if (GUILayout.Button("Remove", GUILayout.Width(110)))
                     {
                         _multiList.RemoveAt(i);
                         break;
@@ -264,6 +269,20 @@ namespace Shadster.AvatarTools.FxSetup
                 vrcMenu = (VRCExpressionsMenu)EditorGUILayout.ObjectField(vrcMenu, typeof(VRCExpressionsMenu), true, GUILayout.Height(24));
                 vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
             }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                tempObject = (GameObject)EditorGUILayout.ObjectField(tempObject, typeof(GameObject), true, GUILayout.Height(24));
+                if (GUILayout.Button("Generate Toggle Object", GUILayout.Height(24)))
+                {
+                    if (tempObject != null)
+                    {
+                        var clips = ShadstersAvatarTools.GenerateAnimationToggle(tempObject, vrcAvatar);
+                        ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, (tempObject.name + " Toggle"), tempObject.name, clips[0], clips[1]);
+                        ShadstersAvatarTools.CreateMenuControl(vrcAvatarDescriptor, tempObject.name + " Toggle", VRCExpressionsMenu.Control.ControlType.Toggle, tempObject.name);
+                    }
+                }
+            }
+            GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
             if (vrcMenu != null)
             {
                 DrawMenuItems(vrcMenu, vrcParameters);

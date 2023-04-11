@@ -94,29 +94,42 @@ public class _GogoSetupWindow : EditorWindow
             vrcParameters = (VRCExpressionParameters)EditorGUILayout.ObjectField(vrcParameters, typeof(VRCExpressionParameters), true, GUILayout.Height(24));
         }
         GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
-        using (new EditorGUILayout.HorizontalScope())
-        {
             
-            using (new EditorGUI.DisabledScope(vrcAvatarDescriptor == null))
+        using (new EditorGUI.DisabledScope(vrcAvatarDescriptor == null))
+        {
+            using (new EditorGUI.DisabledScope(!ShadstersAvatarTools.GogoLocoExist()))
             {
-                using (new EditorGUI.DisabledScope(!ShadstersAvatarTools.GogoLocoExist()))
+                using (new EditorGUILayout.HorizontalScope())
                 {
-                    using (new EditorGUILayout.HorizontalScope())
+                    if (GUILayout.Button("Setup Gogo Layers", GUILayout.Height(24)))
                     {
-                        if (GUILayout.Button("Setup Gogo Layers", GUILayout.Height(24)))
-                        {
-                            ShadstersAvatarTools.SetupGogoLocoLayers(vrcAvatarDescriptor);
-                        }
-                        if (GUILayout.Button("Add Gogo Menu", GUILayout.Height(24)))
-                        {
-                            ShadstersAvatarTools.SetupGogoLocoMenu(vrcMenu);
-                        }
-                        if (GUILayout.Button("Add Gogo Params", GUILayout.Height(24)))
-                        {
-                            ShadstersAvatarTools.SetupGogoLocoParams(vrcParameters);
-                        }
-
+                        ShadstersAvatarTools.SetupGogoLocoLayers(vrcAvatarDescriptor);
                     }
+                    if (GUILayout.Button("Add Gogo Menu", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetupGogoLocoMenu(vrcMenu);
+                    }
+                    if (GUILayout.Button("Add Gogo Params", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetupGogoLocoParams(vrcParameters);
+                    }
+
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Setup Broke Layers", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetupGogoBrokeLayers(vrcAvatarDescriptor);
+                    }
+                    if (GUILayout.Button("Add Broke Menu", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetupGogoBrokeMenu(vrcMenu);
+                    }
+                    if (GUILayout.Button("Add Broke Params", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetupGogoBrokeParams(vrcParameters);
+                    }
+
                 }
             }
         }
