@@ -10,6 +10,7 @@ Shadsterwolf's own avatar tools, mostly used for personal use and subject to cha
 1. With a project open with VRCSDK (from VRChat Content Creator)
 2. Import my provided released package
 3. In Unity, on your toolbar, click "ShadsterWolf" > Show Avatar Tools
+
 (Pro-tip, use Alt+S to bring up my tool menu, S again for Main tool window, G for Gogo Loco Setup, F for FX Setup)
 
 # Features
