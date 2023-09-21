@@ -6,6 +6,7 @@ using UnityEditor.Animations;
 using UnityEngine;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDK3.Avatars.ScriptableObjects;
+using YamlDotNet.Core.Tokens;
 
 namespace Shadster.AvatarTools.FxSetup
 {
@@ -51,7 +52,7 @@ namespace Shadster.AvatarTools.FxSetup
                 toolWindow = EditorWindow.GetWindow<_FxSetupWindow>();
                 toolWindow.autoRepaintOnSceneChange = true;
                 toolWindow.titleContent = new GUIContent("FX Setup");
-                toolWindow.minSize = new Vector2(500, 800);
+                toolWindow.minSize = new Vector2(500, 200);
             }
             toolWindow.Show();
         }
@@ -124,13 +125,13 @@ namespace Shadster.AvatarTools.FxSetup
                     //Debug.Log(_meshRenderers[i].name + " = " + _meshRenderers[i].enabled);
                     if (_meshRenderers[i].enabled && _meshRenderers[i].gameObject.activeInHierarchy)
                     {
-                        ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, _meshRenderers[i].name + " Toggle", _meshRenderers[i].name, clips[1], clips[0]);
+                        ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, _meshRenderers[i].name, _meshRenderers[i].name, clips[0], clips[1], 1f);
                     }
                     else
                     {
-                        ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, _meshRenderers[i].name + " Toggle", _meshRenderers[i].name, clips[0], clips[1]);
+                        ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, _meshRenderers[i].name, _meshRenderers[i].name, clips[0], clips[1], 0f);
                     }
-                    ShadstersAvatarTools.CreateMenuControl(vrcAvatarDescriptor, _meshRenderers[i].name + " Toggle", VRCExpressionsMenu.Control.ControlType.Toggle, _meshRenderers[i].name);
+                    ShadstersAvatarTools.CreateMenuControl(vrcMenu, _meshRenderers[i].name, VRCExpressionsMenu.Control.ControlType.Toggle, _meshRenderers[i].name);
 
                     break;
                 }
@@ -163,14 +164,18 @@ namespace Shadster.AvatarTools.FxSetup
                     if (shapeKeyDropdown.Length > 0)
                     {
                         _selectedKeys[i] = EditorGUILayout.Popup("Shape keys", _selectedKeys[i], shapeKeyDropdown);
+                        string key = shapeKeyDropdown[_selectedKeys[i]];
                         if (GUILayout.Button("Add Toggle", GUILayout.Width(110)))
                         {
-                            vrcFx.AddLayer(shapeKeyDropdown[_selectedKeys[i]] + " Toggle");
+                            vrcFx.AddLayer(key + " Toggle");
+                            var clips = ShadstersAvatarTools.GenerateShapekeyToggle(_meshRenderers[i].GetComponent<SkinnedMeshRenderer>(), key, vrcAvatar);
+                            ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, (key + " Toggle"), key, clips[0], clips[1]);
+                            ShadstersAvatarTools.CreateMenuControl(vrcMenu, key + " Toggle", VRCExpressionsMenu.Control.ControlType.Toggle, key);
                             break;
                         }
                         if (GUILayout.Button("Add Slider", GUILayout.Width(110)))
                         {
-                            vrcFx.AddLayer(shapeKeyDropdown[_selectedKeys[i]] + " Slider");
+                            vrcFx.AddLayer(key + " Slider");
                             break;
                         }
                         //EditorGUILayout.LabelField("Value: " + _meshRenderers[i].GetComponent<SkinnedMeshRenderer>().GetBlendShapeWeight(selectedKey));
@@ -278,7 +283,7 @@ namespace Shadster.AvatarTools.FxSetup
                     {
                         var clips = ShadstersAvatarTools.GenerateAnimationToggle(tempObject, vrcAvatar);
                         ShadstersAvatarTools.CreateToggle(vrcAvatarDescriptor, (tempObject.name + " Toggle"), tempObject.name, clips[0], clips[1]);
-                        ShadstersAvatarTools.CreateMenuControl(vrcAvatarDescriptor, tempObject.name + " Toggle", VRCExpressionsMenu.Control.ControlType.Toggle, tempObject.name);
+                        ShadstersAvatarTools.CreateMenuControl(vrcMenu, tempObject.name + " Toggle", VRCExpressionsMenu.Control.ControlType.Toggle, tempObject.name);
                     }
                 }
             }

@@ -36,10 +36,12 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
         [SerializeReference] private string menuControlName;
         [SerializeReference] private bool createControlChecked;
 
+        [SerializeReference] private bool commonFoldView;
         [SerializeReference] private bool bonesFoldView;
         [SerializeReference] private bool animationFoldView;
         [SerializeReference] private bool texturesFoldView;
         [SerializeReference] private bool scenesFoldView;
+        [SerializeReference] private bool gogoFoldView;
 
         [SerializeReference] private Transform breastBoneL;
         [SerializeReference] private Transform breastBoneR;
@@ -72,7 +74,7 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                 toolWindow = EditorWindow.GetWindow<_ShadsterAvatarToolsWindow>();
                 toolWindow.autoRepaintOnSceneChange = true;
                 toolWindow.titleContent = new GUIContent("Shadster Tools");
-                toolWindow.minSize = new Vector2(500, 800);
+                toolWindow.minSize = new Vector2(500, 200);
             }
             toolWindow.Show();
         }
@@ -127,7 +129,46 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
             return false;
         }
 
+        public void DrawCommonFoldout()
+        {
+            using (new EditorGUILayout.VerticalScope())
+            {
+                Rect subBoxRect = EditorGUILayout.BeginVertical();
+                subBoxRect.x += 4;
+                subBoxRect.width -= 4;
+                subBoxRect.height += 2;
+                //Color currentColor = GUI.color;
+                //GUI.color = new Color(0.4f, 1f, 0.4f);
+                GUI.Box(subBoxRect, "");
 
+                //GUI.color = currentColor;
+                commonFoldView = EditorGUILayout.Foldout(commonFoldView, "Common");
+                if (commonFoldView)
+                {
+                    if (GUILayout.Button("Fix Avatar Descriptor (Missing Face/Body)", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.FixAvatarDescriptor(vrcAvatarDescriptor);
+                    }
+                    if (GUILayout.Button("Set All Mesh Bounds to 2.5sq", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetAvatarMeshBounds(vrcAvatar);
+                    }
+                    if (GUILayout.Button("Set All Anchor Probes to Hip", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.SetAvatarAnchorProbes(vrcAvatar);
+                    }
+                    if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
+                    {
+                        ShadstersAvatarTools.ClearAvatarBlueprintID(vrcAvatar);
+                    }
+                    //if (GUILayout.Button("Save Avatar Prefab", GUILayout.Height(24)))
+                    //{
+                    //    ShadstersAvatarTools.SaveAvatarPrefab(vrcAvatar);
+                    //}
+                }
+                EditorGUILayout.EndVertical();
+            }
+        }
         public void DrawBonesWindow()
         {
             using (new EditorGUILayout.VerticalScope())
@@ -147,25 +188,25 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
 
                     Color currentBackgroundColor = GUI.backgroundColor;
                     GUI.backgroundColor = new Color(0.6f, 1.5f, 0.6f);
-                    EditorGUILayout.LabelField("Breast Bones");
-                    using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-                    {
-                        breastBoneL = (Transform)EditorGUILayout.ObjectField(breastBoneL, typeof(Transform), true, GUILayout.Height(24));
-                        breastBoneR = (Transform)EditorGUILayout.ObjectField(breastBoneR, typeof(Transform), true, GUILayout.Height(24));
-                    }
-                    EditorGUILayout.LabelField("Butt Bones");
-                    using (var horizontalScope = new EditorGUILayout.HorizontalScope())
-                    {
-                        buttBoneL = (Transform)EditorGUILayout.ObjectField(buttBoneL, typeof(Transform), true, GUILayout.Height(24));
-                        buttBoneR = (Transform)EditorGUILayout.ObjectField(buttBoneR, typeof(Transform), true, GUILayout.Height(24));
-                    }
-                    if (GUILayout.Button("Auto Add PhysBones", GUILayout.Height(24)))
-                    {
-                        ShadstersAvatarTools.AddPhysBones(breastBoneL);
-                        ShadstersAvatarTools.AddPhysBones(breastBoneR);
-                        ShadstersAvatarTools.AddButtPhysBones(buttBoneL);
-                        ShadstersAvatarTools.AddButtPhysBones(buttBoneR);
-                    }
+                    //EditorGUILayout.LabelField("Breast Bones");
+                    //using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                    //{
+                    //    breastBoneL = (Transform)EditorGUILayout.ObjectField(breastBoneL, typeof(Transform), true, GUILayout.Height(24));
+                    //    breastBoneR = (Transform)EditorGUILayout.ObjectField(breastBoneR, typeof(Transform), true, GUILayout.Height(24));
+                    //}
+                    //EditorGUILayout.LabelField("Butt Bones");
+                    //using (var horizontalScope = new EditorGUILayout.HorizontalScope())
+                    //{
+                    //    buttBoneL = (Transform)EditorGUILayout.ObjectField(buttBoneL, typeof(Transform), true, GUILayout.Height(24));
+                    //    buttBoneR = (Transform)EditorGUILayout.ObjectField(buttBoneR, typeof(Transform), true, GUILayout.Height(24));
+                    //}
+                    //if (GUILayout.Button("Auto Add PhysBones", GUILayout.Height(24)))
+                    //{
+                    //    ShadstersAvatarTools.AddPhysBones(breastBoneL);
+                    //    ShadstersAvatarTools.AddPhysBones(breastBoneR);
+                    //    ShadstersAvatarTools.AddButtPhysBones(buttBoneL);
+                    //    ShadstersAvatarTools.AddButtPhysBones(buttBoneR);
+                    //}
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         if (GUILayout.Button("Move PhysBones from Armature", GUILayout.Height(24)))
@@ -222,15 +263,17 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                     }
                     if (GUILayout.Button("Generate Animation Shapekeys", GUILayout.Height(24)))
                     {
-                        //GenerateAnimationShapekeys(vrcAvatar);
                         ShadstersAvatarTools.CombineAnimationShapekeys(vrcAvatar);
                         ShadstersAvatarTools.CombineEmoteShapekeys(vrcAvatar);
                     }
-                    if (GUILayout.Button("Generate Animation Poi Hues", GUILayout.Height(24)))
+                    if (GUILayout.Button("Generate Animation Physbones", GUILayout.Height(24)))
                     {
-                        //GenerateAnimationShapekeys(vrcAvatar);
-                        ShadstersAvatarTools.GenerateAnimationHueShaders(vrcAvatar);
+                        ShadstersAvatarTools.GenerateAnimationPhysbones(vrcAvatar, vrcAvatarDescriptor);
                     }
+                    //if (GUILayout.Button("Generate Animation Poi Hues", GUILayout.Height(24)))
+                    //{
+                    //    ShadstersAvatarTools.GenerateAnimationHueShaders(vrcAvatar);
+                    //}
                     if (GUILayout.Button("Generate Emote Override Menu", GUILayout.Height(24)))
                     {
                         ShadstersAvatarTools.GenerateEmoteOverrideMenu(vrcAvatarDescriptor);
@@ -397,7 +440,14 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                     boldCenteredStyle.alignment = TextAnchor.MiddleCenter;
                     boldCenteredStyle.fontStyle = FontStyle.Bold;
 
-                    GUILayout.Label(context, boldCenteredStyle);
+                    GUILayout.Label("Context: " + context, boldCenteredStyle);
+                    if (GUILayout.Button("Regenerate context with new GUIDs", GUILayout.Height(24)))
+                    {
+                        if (Prompt("Regenerate context with new GUIDs"))
+                        {
+                            ShadstersAvatarTools.CloneAndRegenerateGUIDs(context);
+                        }
+                    }
                     if (GUILayout.Button("Cleanup All Related Scenes", GUILayout.Height(24)))
                     {
                         if (Prompt("Cleanup All Related Scenes"))
@@ -417,6 +467,75 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                         ShadstersAvatarTools.Export();
                     }
 
+                    GUI.backgroundColor = currentBackgroundColor;
+                }
+                EditorGUILayout.EndVertical();
+            }
+        }
+
+        public void DrawGogoFoldout()
+        {
+            using (new EditorGUILayout.VerticalScope())
+            {
+                Rect subBoxRect = EditorGUILayout.BeginVertical();
+                subBoxRect.x += 4;
+                subBoxRect.width -= 4;
+                subBoxRect.height += 2;
+                Color currentColor = GUI.color;
+                GUI.color = new Color(1.0f, 0.65f, 0f);
+                GUI.Box(subBoxRect, "");
+
+                GUI.color = currentColor;
+                gogoFoldView = EditorGUILayout.Foldout(gogoFoldView, "Gogo Loco");
+                if (gogoFoldView)
+                {
+
+                    Color currentBackgroundColor = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(1.6f, 1f, 0f);
+                    using (new EditorGUI.DisabledScope(!ShadstersAvatarTools.GogoLocoExist()))
+                    {
+                        GUILayout.Label("Beyond Setup:", GUILayout.Height(24));
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            if (GUILayout.Button("Setup Prefab", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoBeyondPrefab(vrcAvatar);
+                            }
+                            if (GUILayout.Button("Setup Layers", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoBeyondLayers(vrcAvatarDescriptor);
+                            }
+                            if (GUILayout.Button("Setup Menu", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoBeyondMenu(vrcMenu);
+                            }
+                            if (GUILayout.Button("Setup Params", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoBeyondParams(vrcParameters);
+                            }
+                            if (GUILayout.Button("Setup FX", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoBeyondFX(vrcAvatarDescriptor);
+                            }
+                        }
+                        GUILayout.Label("All Setup:", GUILayout.Height(24));
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            if (GUILayout.Button("Setup Layers", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoLocoLayers(vrcAvatarDescriptor);
+                            }
+                            if (GUILayout.Button("Setup Menu", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoLocoMenu(vrcMenu);
+                            }
+                            if (GUILayout.Button("Setup Params", GUILayout.Height(24)))
+                            {
+                                ShadstersAvatarTools.SetupGogoLocoParams(vrcParameters);
+                            }
+
+                        }
+                    }
                     GUI.backgroundColor = currentBackgroundColor;
                 }
                 EditorGUILayout.EndVertical();
@@ -470,45 +589,27 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
             }
             using (new EditorGUILayout.HorizontalScope())
             {
-                var testPhysbonesState = GUILayout.Toggle(testPhysbones, new GUIContent("Test All Avatar Physbones", "When in Play Mode, automatically moves the avatar to check behaviour of physbones"), GUILayout.Height(24), GUILayout.Width(250));
-                if (testPhysbonesState != testPhysbones)
-                {
-                    ShadstersAvatarTools.SetTestPhysbones(testPhysbonesState);
-                    testPhysbones = ShadstersAvatarTools.GetTestPhysbones();
-                }
-                var ignorePhysToggleState = GUILayout.Toggle(ignorePhysImmobile, new GUIContent("Ignore Physbone Immobile World", "When in Play Mode, updates all physbones with Immobile World Type to zero"), GUILayout.Height(24));
+                var ignorePhysToggleState = GUILayout.Toggle(ignorePhysImmobile, new GUIContent("Ignore Physbone Immobile", "When in Play Mode, updates all physbones with Immobile World Type to zero"), GUILayout.Height(24), GUILayout.Width(250));
                 if (ignorePhysToggleState != ignorePhysImmobile)
                 {
                     ShadstersAvatarTools.SetIgnorePhysImmobile(ignorePhysToggleState);
                     ignorePhysImmobile = ShadstersAvatarTools.GetIgnorePhysImmobile();
                 }
+                var testPhysbonesState = GUILayout.Toggle(testPhysbones, new GUIContent("Test All Avatar Physbones", "When in Play Mode, automatically moves the avatar to check behaviour of physbones"), GUILayout.Height(24));
+                if (testPhysbonesState != testPhysbones)
+                {
+                    ShadstersAvatarTools.SetTestPhysbones(testPhysbonesState);
+                    testPhysbones = ShadstersAvatarTools.GetTestPhysbones();
+                }
+                
             }
 
             GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3));
             using (new EditorGUI.DisabledScope(vrcAvatarDescriptor == null))
             {
-                if (GUILayout.Button("Fix Avatar Descriptor (Missing Face/Body)", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.FixAvatarDescriptor(vrcAvatarDescriptor);
-                }
-                if (GUILayout.Button("Set All Mesh Bounds to 2.5sq", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.SetAvatarMeshBounds(vrcAvatar);
-                }
-                if (GUILayout.Button("Set All Anchor Probes to Hip", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.SetAvatarAnchorProbes(vrcAvatar);
-                }                
-                if (GUILayout.Button("Clear Avatar Blueprint ID", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.ClearAvatarBlueprintID(vrcAvatar);
-                }
-                if (GUILayout.Button("Save Avatar Prefab", GUILayout.Height(24)))
-                {
-                    ShadstersAvatarTools.SaveAvatarPrefab(vrcAvatar);
-                }
+                
 
-
+                DrawCommonFoldout();
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
                 DrawTexturesWindow();
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
@@ -516,7 +617,8 @@ namespace Shadster.AvatarTools.ShadsterAvatarToolsWindow
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
                 DrawAnimationFoldout();
                 GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
-
+                DrawGogoFoldout();
+                GUILayout.Box(GUIContent.none, GUILayout.ExpandWidth(true), GUILayout.Height(3)); // NEW LINE ----------------------
             } // Using Disable Scope
             DrawScenesWindow();
 

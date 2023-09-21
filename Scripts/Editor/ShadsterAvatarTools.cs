@@ -7,14 +7,13 @@ using UnityEngine;
 using System.Linq;
 using UnityEngine.UI;
 using UnityEditor.Animations;
-using Codice.CM.Common.Zlib;
-using VRC.SDK3.Avatars.ScriptableObjects;
-using NUnit.Framework.Constraints;
-using static Unity.Burst.Intrinsics.X86;
-#if VRC_SDK_VRCSDK3 && !UDON
+using System.Collections;
+using UnityEngine.Animations;
+#if VRC_SDK_VRCSDK3
 using VRC.Core;
 using VRC.SDKBase;
 using VRC.SDK3.Avatars.Components;
+using VRC.SDK3.Avatars.ScriptableObjects;
 using VRC_SpatialAudioSource = VRC.SDK3.Avatars.Components.VRCSpatialAudioSource;
 using VRC_PhysBone = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBone;
 using VRC_PhysCollider = VRC.SDK3.Dynamics.PhysBone.Components.VRCPhysBoneCollider;
@@ -145,15 +144,9 @@ namespace Shadster.AvatarTools
             List<VRC_PhysBone> result = new List<VRC_PhysBone>();
             if (armature != null)
             {
-                foreach (Transform bone in vrcAvatar.GetComponentsInChildren<Transform>(true))
+                foreach (var pBone in vrcAvatar.GetComponentsInChildren<VRC_PhysBone>(true))
                 {
-                    if (BoneHasPhysBones(bone))
-                    {
-                        VRC_PhysBone pBone = bone.GetComponent<VRC_PhysBone>();
-                        result.Add(pBone);
-                    }
-
-
+                    result.Add(pBone);
                 }
             }
             //Debug.Log(result);
@@ -421,8 +414,13 @@ namespace Shadster.AvatarTools
 
         public static void CreateToggle(VRCAvatarDescriptor vrcAvatarDescriptor, string layerName, string paramName, AnimationClip clipA, AnimationClip clipB)
         {
+            CreateToggle(vrcAvatarDescriptor, layerName, paramName, clipA, clipB, 0f);
+        }
+
+        public static void CreateToggle(VRCAvatarDescriptor vrcAvatarDescriptor, string layerName, string paramName, AnimationClip clipA, AnimationClip clipB, float paramValue)
+        {
             var fx = GetFxController(vrcAvatarDescriptor);
-            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool);
+            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Bool, paramValue);
             DeleteExistingFxLayer(fx, layerName);
 
             fx.AddLayer(layerName);
@@ -432,11 +430,8 @@ namespace Shadster.AvatarTools
             newLayer.defaultWeight = 1f;
 
             var startState = newLayer.stateMachine.AddState(clipA.name, new Vector3(250, 120));
-
-            //Debug.Log("Statemachine: " + clipA.name + " " + clipA.GetInstanceID());
-
             var endState = newLayer.stateMachine.AddState(clipB.name, new Vector3(250, 20));
-
+            //Debug.Log("Statemachine: " + clipA.name + " " + clipA.GetInstanceID());
             //Debug.Log("Statemachine: " + clipB.name + " " + clipB.GetInstanceID());
 
             startState.AddTransition(endState);
@@ -461,11 +456,15 @@ namespace Shadster.AvatarTools
 
             AssetDatabase.SaveAssets();
         }
-
         public static void CreateBlendTree(VRCAvatarDescriptor vrcAvatarDescriptor, string layerName, string paramName, AnimationClip clipA, AnimationClip clipB)
         {
+            CreateBlendTree(vrcAvatarDescriptor, layerName, paramName, 0, clipA, clipB);
+        }
+
+        public static void CreateBlendTree(VRCAvatarDescriptor vrcAvatarDescriptor, string layerName, string paramName, float defaultValue, AnimationClip clipA, AnimationClip clipB)
+        {
             var fx = GetFxController(vrcAvatarDescriptor);
-            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float);
+            CreateFxParameter(vrcAvatarDescriptor, paramName, AnimatorControllerParameterType.Float, defaultValue);
 
             for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
             {
@@ -528,6 +527,10 @@ namespace Shadster.AvatarTools
 
         public static void CreateFxParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, AnimatorControllerParameterType dataType)
         {
+            CreateFxParameter(vrcAvatarDescriptor, paramName, dataType, 0);
+        }
+        public static void CreateFxParameter(VRCAvatarDescriptor vrcAvatarDescriptor, string paramName, AnimatorControllerParameterType dataType, float defaultValue)
+        {
             var fx = GetFxController(vrcAvatarDescriptor);
             VRCExpressionParameters.ValueType vrcParamType = ConvertAnimatorToVrcParamType(dataType);
 
@@ -538,7 +541,7 @@ namespace Shadster.AvatarTools
             }
             fx.AddParameter(paramName, dataType);
 
-            CreateVrcParameter(vrcAvatarDescriptor.expressionParameters, paramName, vrcParamType);
+            CreateVrcParameter(vrcAvatarDescriptor.expressionParameters, paramName, vrcParamType, defaultValue, true);
 
             EditorUtility.SetDirty(fx);
             AssetDatabase.Refresh();
@@ -568,6 +571,7 @@ namespace Shadster.AvatarTools
                 defaultValue = defaultValue,
                 saved = saved
             };
+            //Debug.Log(newVrcExParam.name + ", default value: " + newVrcExParam.defaultValue);
             vrcExParams.Add(newVrcExParam);
             vrcParameters.parameters = vrcExParams.ToArray();
 
@@ -582,34 +586,65 @@ namespace Shadster.AvatarTools
             {
                 var listVrcParameters = vrcParameters.parameters.ToList();
                 listVrcParameters.Remove(parameter);
+                vrcParameters.parameters = listVrcParameters.ToArray();
+                EditorUtility.SetDirty(vrcParameters);
+                AssetDatabase.Refresh();
             }
+
         }
 
         public static void SetupGogoLocoParams(VRCExpressionParameters vrcParameters)
         {
-            CreateVrcParameter(vrcParameters, "VRCEmote", VRCExpressionParameters.ValueType.Int, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/Float", VRCExpressionParameters.ValueType.Float, 0.25f, false);
-            CreateVrcParameter(vrcParameters, "Go/Stationary", VRCExpressionParameters.ValueType.Bool, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/Locomotion", VRCExpressionParameters.ValueType.Bool, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/JumpAndFall", VRCExpressionParameters.ValueType.Bool, 0, true);
+            SetupGogoBeyondParams(vrcParameters);
         }
 
-        public static void SetupGogoBrokeParams(VRCExpressionParameters vrcParameters)
+        public static void SetupGogoBeyondParams(VRCExpressionParameters vrcParameters)
         {
-            CreateVrcParameter(vrcParameters, "VRCEmote", VRCExpressionParameters.ValueType.Int, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/Float", VRCExpressionParameters.ValueType.Float, 0.25f, false);
+            DeleteVrcParameter(vrcParameters, "Go/JumpAndFall");
+            DeleteVrcParameter(vrcParameters, "Go/ScaleFloat");
+            DeleteVrcParameter(vrcParameters, "Go/Horizon");
+            DeleteVrcParameter(vrcParameters, "Go/ThirdPerson");
+            DeleteVrcParameter(vrcParameters, "Go/ThirdPersonMirror");
+            CreateVrcParameter(vrcParameters, "VRCEmote", VRCExpressionParameters.ValueType.Int, 0, true);
+            CreateVrcParameter(vrcParameters, "Go/Float", VRCExpressionParameters.ValueType.Float, 0f, true);
+            CreateVrcParameter(vrcParameters, "Go/PoseRadial", VRCExpressionParameters.ValueType.Float, 0f, false);
             CreateVrcParameter(vrcParameters, "Go/Stationary", VRCExpressionParameters.ValueType.Bool, 0, false);
             CreateVrcParameter(vrcParameters, "Go/Locomotion", VRCExpressionParameters.ValueType.Bool, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/JumpAndFall", VRCExpressionParameters.ValueType.Bool, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/ScaleFloat", VRCExpressionParameters.ValueType.Float, 0.25f, true);
-            CreateVrcParameter(vrcParameters, "Go/Horizon", VRCExpressionParameters.ValueType.Bool, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/ThirdPerson", VRCExpressionParameters.ValueType.Float, 0f, true);
-            CreateVrcParameter(vrcParameters, "Go/ThirdPersonMirror", VRCExpressionParameters.ValueType.Bool, 0, true);
+            CreateVrcParameter(vrcParameters, "Go/Jump&Fall", VRCExpressionParameters.ValueType.Bool, 0, true);
+            CreateVrcParameter(vrcParameters, "Go/StandIdle", VRCExpressionParameters.ValueType.Int, 0, true);
+            CreateVrcParameter(vrcParameters, "Go/CrouchIdle", VRCExpressionParameters.ValueType.Int, 0, true);
+            CreateVrcParameter(vrcParameters, "Go/ProneIdle", VRCExpressionParameters.ValueType.Int, 0, true);
+            CreateVrcParameter(vrcParameters, "Go/Swimming", VRCExpressionParameters.ValueType.Bool, 0, false);
+            CreateVrcParameter(vrcParameters, "Go/PuppetX", VRCExpressionParameters.ValueType.Float, 0f, false);
+            CreateVrcParameter(vrcParameters, "Go/PuppetY", VRCExpressionParameters.ValueType.Float, 0f, false);
+            CreateVrcParameter(vrcParameters, "Go/Height", VRCExpressionParameters.ValueType.Float, 0f, true);
+        }
+
+        public static void SetupGogoBeyondFX(VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            var fx = GetFxController(vrcAvatarDescriptor);
+            AnimatorController gogoController = AssetDatabase.LoadAssetAtPath<AnimatorController>("Assets/GoGo/GoLoco/Controllers/GoLocoFXBeyond.controller");
+            
+            CopyControllerParams(gogoController, fx);
+            VRLabs.AV3Manager.AnimatorCloner.CopyControllerLayer(gogoController, 1, fx);
+            VRLabs.AV3Manager.AnimatorCloner.CopyControllerLayer(gogoController, 2, fx);
+
+        }
+
+        public static void CopyControllerParams(AnimatorController source, AnimatorController destination)
+        {
+            foreach (var sParam in source.parameters)
+            {
+                if (!destination.parameters.Contains(sParam))
+                {
+                    destination.AddParameter(sParam);
+                }
+            }
         }
 
         public static void DeleteExistingFxLayer(AnimatorController fx, string layerName)
         {
-            for (int i = 0; i < fx.layers.Length; i++) //delete existing layer
+            for (int i = 0; i < fx.layers.Length; i++)
             {
                 if (fx.layers[i].name.Equals(layerName))
                 {
@@ -617,6 +652,20 @@ namespace Shadster.AvatarTools
                     break;
                 }
             }
+        }
+
+        public static void DeleteControllerParam(AnimatorController ac, string paramName)
+        {
+            for (int i = 0; i < ac.parameters.Length; i++)
+            {
+                if (paramName.Equals(ac.parameters[i].name))
+                {
+                    ac.RemoveParameter(i); //Delete Param
+                    EditorUtility.SetDirty(ac);
+                    AssetDatabase.Refresh();
+                }
+            }
+            
         }
 
         public static AnimationClip SaveAnimation(AnimationClip anim, string savePath)
@@ -704,7 +753,6 @@ namespace Shadster.AvatarTools
                 allOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0)));
                 allOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 1)));
 
-
                 SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
                 SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Toggles");
             }
@@ -723,9 +771,11 @@ namespace Shadster.AvatarTools
                 {
                     var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
                     var splitString = smr.sharedMesh.GetBlendShapeName(i).Split('_');
-                    string prefix = splitString[0];
-                    string suffix = splitString[splitString.Length - 1];
-                    if (prefix == r.name)
+                    string prefix = string.Join("_", splitString.Take(splitString.Length - 1));
+                    string suffix = splitString[splitString.Length - 1].ToLower();
+                    //Debug.Log("Prefix: " + prefix);
+                    //Debug.Log("Suffix: " + suffix);
+                    if (prefix == r.name && suffix == "on")
                     {
                         if (toggle)
                             clip.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(i), new AnimationCurve(new Keyframe(0, 100)));
@@ -734,6 +784,25 @@ namespace Shadster.AvatarTools
                     }
                 }
             }
+        }
+
+        public static AnimationClip[] GenerateShapekeyToggle(SkinnedMeshRenderer smr, string shapeKeyName, GameObject vrcAvatar)
+        {
+            AnimationClip[] clips = new AnimationClip[2]; //0 off, 1 on
+            Debug.Log(smr.name);
+            AnimationClip aClipMin = new AnimationClip();
+            AnimationClip aClipMax = new AnimationClip();
+            var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
+            aClipMin.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + shapeKeyName, new AnimationCurve(new Keyframe(0, 0)));
+            aClipMin.name = smr.name + "_" + shapeKeyName + " MIN";
+            aClipMax.SetCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + shapeKeyName, new AnimationCurve(new Keyframe(0, 100)));
+            aClipMax.name = smr.name + "_" + shapeKeyName + " MAX";
+
+            clips[0] = SaveAnimation(aClipMin, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
+            clips[1] = SaveAnimation(aClipMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
+
+            return clips;
+
         }
 
         public static void GenerateAnimationShapekeys(GameObject vrcAvatar)
@@ -756,6 +825,44 @@ namespace Shadster.AvatarTools
                     SaveAnimation(aClipMax, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys");
                 }
             }
+        }
+
+        public static void GenerateAnimationPhysbones(GameObject vrcAvatar, VRCAvatarDescriptor vrcAvatarDescriptor)
+        {
+            //AnimationClip aClipOn = new AnimationClip();
+            //AnimationClip aClipOff = new AnimationClip();
+            AnimationClip aClipCollisonOn = new AnimationClip();
+            AnimationClip aClipCollisonOff = new AnimationClip();
+            AnimationClip aClipCollisionOthers = new AnimationClip();
+            
+            foreach (var pbone in vrcAvatar.GetComponentsInChildren<VRC_PhysBone>(true))
+            {
+
+                var path = AnimationUtility.CalculateTransformPath(pbone.transform, vrcAvatar.transform);
+                aClipCollisonOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
+                aClipCollisonOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
+                aClipCollisionOthers.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
+
+                aClipCollisonOff.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 0)));
+                aClipCollisonOn.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 1), new Keyframe(0.1f, 1)));
+                aClipCollisionOthers.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 2), new Keyframe(0.1f, 2)));
+
+                aClipCollisonOn.name = "Physbone Collision ON";
+                aClipCollisonOff.name = "Physbone Collision OFF";
+                aClipCollisionOthers.name = "Physbone Collision Self OFF";
+
+            }
+            //SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
+            //SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
+            var clip1 = SaveAnimation(aClipCollisonOn, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
+            SaveAnimation(aClipCollisonOff, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
+            var clip2 = SaveAnimation(aClipCollisionOthers, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
+            string paramName = "PhysCollision";
+            CreateToggle(vrcAvatarDescriptor, "PhysCollision Settings", paramName, clip2, clip1);
+            //CreateFxParameter(vrcAvatarDescriptor, "PhysCollision", AnimatorControllerParameterType.Bool);
+            var menu = CreateNewMenu("Menu_Physbones");
+            CreateMenuControl(menu, "Enable Self Colliders" , VRCExpressionsMenu.Control.ControlType.Toggle, paramName);
+
         }
 
         public static void CombineAnimationShapekeys(GameObject vrcAvatar)
@@ -947,6 +1054,10 @@ namespace Shadster.AvatarTools
             CreateMenuControl(vrcMenu, controlName, controlType, paramName);
         }
 
+        public static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, VRCExpressionsMenu subMenu)
+        {
+            CreateMenuControl(vrcMenu, controlName, controlType, "", subMenu, (Texture2D)AssetDatabase.LoadAssetAtPath(("Packages/com.vrchat.avatars/Samples/AV3 Demo Assets/Expressions Menu/Icons/item_folder.png"), typeof(Texture2D)), 1);
+        }
 
         public static void CreateMenuControl(VRCExpressionsMenu vrcMenu, string controlName, VRCExpressionsMenu.Control.ControlType controlType, string paramName, VRCExpressionsMenu subMenu, Texture2D icon, int value)
         {
@@ -1000,27 +1111,28 @@ namespace Shadster.AvatarTools
 
         public static VRCExpressionsMenu CreateNewMenu(string menuName)
         {
-            var menu = new VRCExpressionsMenu();
+            var menu = ScriptableObject.CreateInstance<VRCExpressionsMenu>();
             string saveFolder = GetCurrentSceneRootPath() + "/" + "Menus";
             if (!(AssetDatabase.IsValidFolder(saveFolder)))
                 Directory.CreateDirectory(saveFolder);
             string savePath = GetCurrentSceneRootPath() + "/" + "Menus" + "/" + menuName + ".asset";
             menu.name = menuName;
-            AssetDatabase.CreateAsset(menu, savePath);
+            CreateOrReplaceAsset<VRCExpressionsMenu>(menu, savePath);
+            menu = AssetDatabase.LoadAssetAtPath<VRCExpressionsMenu>(savePath);
             return menu;
         }
 
         public static void SetupGogoLocoMenu(VRCExpressionsMenu vrcMenu)
         {
-            var subMenu = (VRCExpressionsMenu)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoMenus/GoAllMainMenu.asset", typeof(VRCExpressionsMenu));
-            var icon = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/Icons/icon_Go_Loco.png", typeof(Texture2D));
+            var subMenu = (VRCExpressionsMenu)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/MainMenu/Menu/GoAllMenu.asset", typeof(VRCExpressionsMenu));
+            var icon = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Icons/icon_Go_Loco.png", typeof(Texture2D));
             CreateMenuControl(vrcMenu, "GoGo Loco Menu", VRCExpressionsMenu.Control.ControlType.SubMenu, "", subMenu, icon);
         }
 
-        public static void SetupGogoBrokeMenu(VRCExpressionsMenu vrcMenu)
+        public static void SetupGogoBeyondMenu(VRCExpressionsMenu vrcMenu)
         {
-            var subMenu = (VRCExpressionsMenu)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoMenus/GoSubMenu/GoBrokeMenu.asset", typeof(VRCExpressionsMenu));
-            var icon = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/Icons/icon_Go_Loco.png", typeof(Texture2D));
+            var subMenu = (VRCExpressionsMenu)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/MainMenu/Menu/GoBeyondMenu.asset", typeof(VRCExpressionsMenu));
+            var icon = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Icons/icon_Go_Loco.png", typeof(Texture2D));
             CreateMenuControl(vrcMenu, "GoGo Loco Menu", VRCExpressionsMenu.Control.ControlType.SubMenu, "", subMenu, icon);
         }
 
@@ -1163,7 +1275,7 @@ namespace Shadster.AvatarTools
 
         public static bool GogoLocoExist()
         {
-            if (!(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID("Assets/GoGo/Loco/GoControllers/GoLocoBase.controller"))))
+            if (!(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID("Assets/GoGo/GoLoco/Controllers/GoLocoBase.controller"))))
             {
                 return true;
             }
@@ -1179,13 +1291,13 @@ namespace Shadster.AvatarTools
             vrcAvatarDescriptor.baseAnimationLayers[3].isDefault = false; //Action
             vrcAvatarDescriptor.specialAnimationLayers[0].isDefault = false; //Sitting
 
-            vrcAvatarDescriptor.baseAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoBase.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.baseAnimationLayers[3].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoAction.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.specialAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoSitting.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoBase.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[3].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoAction.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.specialAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoSitting.controller", typeof(RuntimeAnimatorController));
             //Debug.Log(AssetDatabase.GetAssetPath(vrcAvatarDescriptor.specialAnimationLayers[0].animatorController));
         }
 
-        public static void SetupGogoBrokeLayers(VRCAvatarDescriptor vrcAvatarDescriptor)
+        public static void SetupGogoBeyondLayers(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
             vrcAvatarDescriptor.customizeAnimationLayers = true; //ensure customizing playable layers is true
             vrcAvatarDescriptor.autoLocomotion = false; //disable force 6-point tracking
@@ -1197,12 +1309,46 @@ namespace Shadster.AvatarTools
             vrcAvatarDescriptor.specialAnimationLayers[0].isDefault = false; //Sitting
             vrcAvatarDescriptor.specialAnimationLayers[1].isDefault = false; //TPose
 
-            vrcAvatarDescriptor.baseAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoBase.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.baseAnimationLayers[1].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoAdditive.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.baseAnimationLayers[2].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoGesture.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.baseAnimationLayers[3].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoAction.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.specialAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoLocoSitting.controller", typeof(RuntimeAnimatorController));
-            vrcAvatarDescriptor.specialAnimationLayers[1].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/Loco/GoControllers/GoBeyond+/GoLocoTPose.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoBase.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[1].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoAdditive.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[2].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoGesture.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.baseAnimationLayers[3].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoAction.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.specialAnimationLayers[0].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoSitting.controller", typeof(RuntimeAnimatorController));
+            vrcAvatarDescriptor.specialAnimationLayers[1].animatorController = (RuntimeAnimatorController)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Controllers/GoLocoTPose.controller", typeof(RuntimeAnimatorController));
+        }
+
+        public static void SetupGogoBeyondPrefab(GameObject vrcAvatar)
+        {
+            var existingPrefab = vrcAvatar.transform.Find("Beyond Prefab");
+            if (existingPrefab != null)
+            {
+                DestroyImmediate(existingPrefab.gameObject);
+            }
+
+            string prefabPath = "Assets/GoGo/GoLoco/Prefabs/Beyond Prefab.prefab";
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab != null)
+            {
+                GameObject ob = GameObject.Instantiate(prefab, vrcAvatar.transform);
+                ob.name = "Beyond Prefab";
+                Transform flyRotation = ob.transform.Find("Fly/Rotation");
+                if (flyRotation != null)
+                {
+                    RotationConstraint constraint = flyRotation.GetComponent<RotationConstraint>();
+                    if (constraint != null)
+                    {
+                        Transform head = vrcAvatar.transform.Find("Armature/Hips/Spine/Chest/Neck/Head");
+                        if (head != null)
+                        {
+                            ConstraintSource source = new ConstraintSource();
+                            source.sourceTransform = head;
+                            source.weight = 1.0f;
+
+                            constraint.SetSource(0, source);
+                        } else { Debug.LogError("Head not found in the hierarchy."); }
+                    } else { Debug.LogError("RotationConstraint component not found on 'Fly/Rotation' GameObject."); }
+                } else { Debug.LogError("'Fly/Rotation' GameObject not found."); }
+            } else { Debug.LogError("Prefab not found at path: " + prefabPath); }
         }
 
         public static float GetAvatarHeight(GameObject vrcAvatar)
@@ -1490,92 +1636,306 @@ namespace Shadster.AvatarTools
             return null;
         }
 
+        public static Material[] GetUniqueMaterials(GameObject obj)
+        {
+            SkinnedMeshRenderer[] skinnedMeshRenderers = obj.GetComponentsInChildren<SkinnedMeshRenderer>();
+            HashSet<Material> uniqueMaterials = new HashSet<Material>();
+            foreach (SkinnedMeshRenderer renderer in skinnedMeshRenderers)
+            {
+                Material[] materials = renderer.sharedMaterials;
+                foreach (Material material in materials)
+                {
+                    uniqueMaterials.Add(material);
+                }
+            }
+            Material[] uniqueMaterialArray = new Material[uniqueMaterials.Count];
+            uniqueMaterials.CopyTo(uniqueMaterialArray);
+            return uniqueMaterialArray;
+        }
+
         public static void GenerateAnimationHueShaders(GameObject vrcAvatar)
         {
-            AnimationClip aClipMainHueMin = new AnimationClip();
-            AnimationClip aClipMainHueMax = new AnimationClip();
-            AnimationClip aClipDecal0HueMin = new AnimationClip();
-            AnimationClip aClipDecal0HueMax = new AnimationClip();
-            AnimationClip aClipDecal1HueMin = new AnimationClip();
-            AnimationClip aClipDecal1HueMax = new AnimationClip();
-            AnimationClip aClipDecal2HueMin = new AnimationClip();
-            AnimationClip aClipDecal2HueMax = new AnimationClip();
-            AnimationClip aClipDecal3HueMin = new AnimationClip();
-            AnimationClip aClipDecal3HueMax = new AnimationClip();
+            var vrcAvatarDescriptor = vrcAvatar.GetComponent<VRCAvatarDescriptor>();
+            var mats = GetUniqueMaterials(vrcAvatar);
+            AnimationClip aClipLightLimitMin = new AnimationClip();
+            AnimationClip aClipLightLimitMax = new AnimationClip();
+            AnimationClip aClipGlitterLimitMin = new AnimationClip();
+            AnimationClip aClipGlitterLimitMax = new AnimationClip();
+            AnimationClip aClipOutlineOn = new AnimationClip();
+            AnimationClip aClipOutlineOff = new AnimationClip();
+            AnimationClip[] aClipMainHueMin = new AnimationClip[mats.Length];
+            AnimationClip[] aClipMainHueMax = new AnimationClip[mats.Length];
+            AnimationClip[] aClipMainSatMin = new AnimationClip[mats.Length];
+            AnimationClip[] aClipMainSatMax = new AnimationClip[mats.Length];
+            AnimationClip[] aClipMainBrightMin = new AnimationClip[mats.Length];
+            AnimationClip[] aClipMainBrightMax = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal0HueMin = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal0HueMax = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal1HueMin = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal1HueMax = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal2HueMin = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal2HueMax = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal3HueMin = new AnimationClip[mats.Length];
+            AnimationClip[] aClipDecal3HueMax = new AnimationClip[mats.Length];
+            for (int i = 0; i < mats.Length; i++)
+            {
+                aClipMainHueMin[i] = new AnimationClip();
+                aClipMainHueMax[i] = new AnimationClip();
+                aClipMainSatMin[i] = new AnimationClip();
+                aClipMainSatMax[i] = new AnimationClip();
+                aClipMainBrightMin[i] = new AnimationClip();
+                aClipMainBrightMax[i] = new AnimationClip();
+                aClipDecal0HueMin[i] = new AnimationClip();
+                aClipDecal0HueMax[i] = new AnimationClip();
+                aClipDecal1HueMin[i] = new AnimationClip();
+                aClipDecal1HueMax[i] = new AnimationClip();
+                aClipDecal2HueMin[i] = new AnimationClip();
+                aClipDecal2HueMax[i] = new AnimationClip();
+                aClipDecal3HueMin[i] = new AnimationClip();
+                aClipDecal3HueMax[i] = new AnimationClip();
+            }
 
+
+            var menuPoi = CreateNewMenu("Menu_Poi");
+            var menuMain = CreateNewMenu("Menu_Poi_Main");
+            var menuDecal0 = CreateNewMenu("Menu_Poi_Decal0");
+            var menuDecal1 = CreateNewMenu("Menu_Poi_Decal1");
+            var menuDecal2 = CreateNewMenu("Menu_Poi_Decal2");
+            var menuDecal3 = CreateNewMenu("Menu_Poi_Decal3");
+
+            string savePath = GetCurrentSceneRootPath() + "/Animations/Generated/Poi";
             foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
-                string savePath = GetCurrentSceneRootPath() + "/Animations/Generated/Poi";
                 //Debug.Log(smr.name);
                 foreach (var mat in smr.sharedMaterials)
                 {
                     //Debug.Log(mat.name);
+                    int i = Array.IndexOf(mats, mats.FirstOrDefault(material => material.name == mat.name));
                     int propertyCount = ShaderUtil.GetPropertyCount(mat.shader);
-                    for (int i = 0; i < propertyCount; i++)
+
+                    var properties = Enumerable.Range(0, propertyCount)
+                        .Where(j => ShaderUtil.GetPropertyType(mat.shader, j) == ShaderUtil.ShaderPropertyType.Range || ShaderUtil.GetPropertyType(mat.shader, j) == ShaderUtil.ShaderPropertyType.Float)
+                        .Select(j => new { PropertyName = ShaderUtil.GetPropertyName(mat.shader, j), FloatValue = mat.GetFloat(ShaderUtil.GetPropertyName(mat.shader, j)) })
+                        .Where(property => property.FloatValue == 1);
+
+                    foreach (var property in properties)
                     {
-                        if (ShaderUtil.GetPropertyType(mat.shader, i) == ShaderUtil.ShaderPropertyType.Range || ShaderUtil.GetPropertyType(mat.shader, i) == ShaderUtil.ShaderPropertyType.Float)
+                        string propertyName = property.PropertyName;
+                        float floatValue = property.FloatValue;
+                        var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
+                        if (propertyName == "_EnableOutlines" && floatValue == 1)
                         {
-                            string propertyName = ShaderUtil.GetPropertyName(mat.shader, i);
-                            float floatValue = mat.GetFloat(propertyName);
-                            //Debug.Log(propertyName);
-                            if (propertyName == "_MainHueShiftToggle" && floatValue == 1)
-                            {
-                                
-                                var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                                aClipMainHueMin.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_MainHueShift", new AnimationCurve(new Keyframe(0, 0)));
-                                aClipMainHueMax.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_MainHueShift", new AnimationCurve(new Keyframe(0, 1)));
-                                aClipMainHueMin.name = "Main Hue" + " MIN";
-                                aClipMainHueMax.name = "Main Hue" + " MAX";
-                            }
-                            if (propertyName == "_DecalHueShiftEnabled" && floatValue == 1)
-                            {
-                                var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                                aClipDecal0HueMin.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift", new AnimationCurve(new Keyframe(0, 0)));
-                                aClipDecal0HueMax.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift", new AnimationCurve(new Keyframe(0, 1)));
-                                aClipDecal0HueMin.name = "Decal0 Hue" + " MIN";
-                                aClipDecal0HueMax.name = "Decal0 Hue" + " MAX";
-                            }
-                            if (propertyName == "_DecalHueShiftEnabled1" && floatValue == 1)
-                            {
-                                var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                                aClipDecal1HueMin.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift1", new AnimationCurve(new Keyframe(0, 0)));
-                                aClipDecal1HueMax.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift1", new AnimationCurve(new Keyframe(0, 1)));
-                                aClipDecal1HueMin.name = "Decal1 Hue" + " MIN";
-                                aClipDecal1HueMax.name = "Decal1 Hue" + " MAX";
-                            }
-                            if (propertyName == "_DecalHueShiftEnabled2" && floatValue == 1)
-                            {
-                                var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                                aClipDecal2HueMin.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift2", new AnimationCurve(new Keyframe(0, 0)));
-                                aClipDecal2HueMax.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift2", new AnimationCurve(new Keyframe(0, 1)));
-                                aClipDecal2HueMin.name = "Decal2 Hue" + " MIN";
-                                aClipDecal2HueMax.name = "Decal2 Hue" + " MAX";
-                            }
-                            if (propertyName == "_DecalHueShiftEnabled3" && floatValue == 1)
-                            {
-                                var path = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
-                                aClipDecal3HueMin.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift3", new AnimationCurve(new Keyframe(0, 0)));
-                                aClipDecal3HueMax.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift3", new AnimationCurve(new Keyframe(0, 1)));
-                                aClipDecal3HueMin.name = "Decal3 Hue" + " MIN";
-                                aClipDecal3HueMax.name = "Decal3 Hue" + " MAX";
-                            }
+                            aClipOutlineOff.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_EnableOutlines", new AnimationCurve(new Keyframe(0, 0)));
+                            aClipOutlineOn.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_EnableOutlines", new AnimationCurve(new Keyframe(0, 1)));
+                            aClipOutlineOff.name = "Outline Off";
+                            aClipOutlineOn.name = "Outline On";
+                        }
+                        if (propertyName == "_LightingCapEnabled" && floatValue == 1)
+                        {
+                            aClipLightLimitMin.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_LightingMinLightBrightness", new AnimationCurve(new Keyframe(0, 0f)));
+                            aClipLightLimitMax.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_LightingMinLightBrightness", new AnimationCurve(new Keyframe(0, 1f)));
+                            aClipLightLimitMin.name = "LightLimit MIN";
+                            aClipLightLimitMax.name = "LightLimit MAX";
+                        }
+                        if (propertyName == "_GlitterEnable" && floatValue == 1)
+                        {
+                            aClipGlitterLimitMin.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_GlitterBrightness", new AnimationCurve(new Keyframe(0, 0f)));
+                            aClipGlitterLimitMax.SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_GlitterBrightness", new AnimationCurve(new Keyframe(0, 2f)));
+                            aClipGlitterLimitMin.name = "GlitterLimit MIN";
+                            aClipGlitterLimitMax.name = "GlitterLimit MAX";
+                        }
+                        if (propertyName == "_MainHueShiftToggle" && floatValue == 1)
+                        {
+                            aClipMainHueMin[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_MainHueShift", new AnimationCurve(new Keyframe(0, 0)));
+                            aClipMainHueMax[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_MainHueShift", new AnimationCurve(new Keyframe(0, 1)));
+                            aClipMainSatMin[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_Saturation", new AnimationCurve(new Keyframe(0, -1)));
+                            aClipMainSatMax[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_Saturation", new AnimationCurve(new Keyframe(0, 1)));
+                            aClipMainBrightMin[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_MainBrightness", new AnimationCurve(new Keyframe(0, -1)));
+                            aClipMainBrightMax[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_MainBrightness", new AnimationCurve(new Keyframe(0, 1)));
+
+                            aClipMainHueMin[i].name = mat.name + "Main Hue" + " MIN";
+                            aClipMainHueMax[i].name = mat.name + "Main Hue" + " MAX";
+                            aClipMainSatMin[i].name = mat.name + "Main Saturation" + " MIN";
+                            aClipMainSatMax[i].name = mat.name + "Main Saturation" + " MAX";
+                            aClipMainBrightMin[i].name = mat.name + "Main Brightness" + " MIN";
+                            aClipMainBrightMax[i].name = mat.name + "Main Brightness" + " MAX";
+                        }
+                        if (propertyName == "_DecalHueShiftEnabled" && floatValue == 1)
+                        {
+                            aClipDecal0HueMin[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift", new AnimationCurve(new Keyframe(0, 0)));
+                            aClipDecal0HueMax[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift", new AnimationCurve(new Keyframe(0, 1)));
+                            aClipDecal0HueMin[i].name = mat.name + "Decal0 Hue" + " MIN";
+                            aClipDecal0HueMax[i].name = mat.name + "Decal0 Hue" + " MAX";
+
+                        }
+                        if (propertyName == "_DecalHueShiftEnabled1" && floatValue == 1)
+                        {
+                            aClipDecal1HueMin[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift1", new AnimationCurve(new Keyframe(0, 0)));
+                            aClipDecal1HueMax[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift1", new AnimationCurve(new Keyframe(0, 1)));
+                            aClipDecal1HueMin[i].name = mat.name + "Decal1 Hue" + " MIN";
+                            aClipDecal1HueMax[i].name = mat.name + "Decal1 Hue" + " MAX";
+                        }
+                        if (propertyName == "_DecalHueShiftEnabled2" && floatValue == 1)
+                        {
+                            aClipDecal2HueMin[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift2", new AnimationCurve(new Keyframe(0, 0)));
+                            aClipDecal2HueMax[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift2", new AnimationCurve(new Keyframe(0, 1)));
+                            aClipDecal2HueMin[i].name = mat.name + "Decal2 Hue" + " MIN";
+                            aClipDecal2HueMax[i].name = mat.name + "Decal2 Hue" + " MAX";
+                        }
+                        if (propertyName == "_DecalHueShiftEnabled3" && floatValue == 1)
+                        {
+                            aClipDecal3HueMin[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift3", new AnimationCurve(new Keyframe(0, 0)));
+                            aClipDecal3HueMax[i].SetCurve(path, typeof(SkinnedMeshRenderer), "material." + "_DecalHueShift3", new AnimationCurve(new Keyframe(0, 1)));
+                            aClipDecal3HueMin[i].name = mat.name + "Decal3 Hue" + " MIN";
+                            aClipDecal3HueMax[i].name = mat.name + "Decal3 Hue" + " MAX";
                         }
                     }
-                    SaveAnimation(aClipMainHueMin, savePath);
-                    SaveAnimation(aClipMainHueMax, savePath);
-                    SaveAnimation(aClipDecal0HueMin, savePath);
-                    SaveAnimation(aClipDecal0HueMax, savePath);
-                    SaveAnimation(aClipDecal1HueMin, savePath);
-                    SaveAnimation(aClipDecal1HueMax, savePath);
-                    SaveAnimation(aClipDecal2HueMin, savePath);
-                    SaveAnimation(aClipDecal2HueMax, savePath);
-                    SaveAnimation(aClipDecal3HueMin, savePath);
-                    SaveAnimation(aClipDecal3HueMax, savePath);
+                }//end foreach mat
+            }// end foreach smr
+            if (aClipOutlineOn != null)
+            {
+                var clip1 = SaveAnimation(aClipOutlineOff, savePath);
+                var clip2 = SaveAnimation(aClipOutlineOn, savePath);
+                CreateBlendTree(vrcAvatarDescriptor, "Poi Outline", "Outline", 0, clip1, clip2);
+                CreateMenuControl(menuPoi, "Outline", VRCExpressionsMenu.Control.ControlType.Toggle, "Outline");
+
+            }
+            if (aClipLightLimitMax != null)
+            {
+                var clip1 = SaveAnimation(aClipLightLimitMin, savePath);
+                var clip2 = SaveAnimation(aClipLightLimitMax, savePath);
+                CreateBlendTree(vrcAvatarDescriptor, "Poi LightLimit", "LightLimit", 0.1f, clip1, clip2);
+                CreateMenuControl(menuPoi, "Min Light Limit", VRCExpressionsMenu.Control.ControlType.RadialPuppet, "LightLimit");
+            }
+            if (aClipGlitterLimitMax != null)
+            {
+                var clip1 = SaveAnimation(aClipGlitterLimitMin, savePath);
+                var clip2 = SaveAnimation(aClipGlitterLimitMax, savePath);
+                CreateBlendTree(vrcAvatarDescriptor, "Poi Glitter Limit", "GlitterLimit", clip1, clip2);
+                CreateMenuControl(menuPoi, "Glitter Brightness", VRCExpressionsMenu.Control.ControlType.RadialPuppet, "GlitterLimit");
+            }
+
+            for (int i = 0; i < mats.Length; i++)
+            {
+                var mat = mats[i];
+                Debug.Log(mat.name);
+                var menuMat = CreateNewMenu("Menu_Poi_" + mat.name);
+                CreateMenuControl(menuPoi, mat.name + " Settings", VRCExpressionsMenu.Control.ControlType.SubMenu, menuMat);
+                if (aClipMainHueMax != null)
+                {
+                    var clip1 = SaveAnimation(aClipMainHueMin[i], savePath);
+                    var clip2 = SaveAnimation(aClipMainHueMax[i], savePath);
+                    var clip5 = SaveAnimation(aClipMainSatMin[i], savePath);
+                    var clip6 = SaveAnimation(aClipMainSatMax[i], savePath);
+                    var clip7 = SaveAnimation(aClipMainBrightMin[i], savePath);
+                    var clip8 = SaveAnimation(aClipMainBrightMax[i], savePath);
+
+                    CreateBlendTree(vrcAvatarDescriptor, mat.name + "Main Hue", mat.name + "MainHue", clip1, clip2);
+                    CreateBlendTree(vrcAvatarDescriptor, mat.name + "Main Saturation", mat.name + "MainSat", 0.5f, clip5, clip6);
+                    CreateBlendTree(vrcAvatarDescriptor, mat.name + "Main Brightness", mat.name + "MainBright", 0.5f, clip7, clip8);
+
+                    CreateMenuControl(menuMat, "Main Hue Color", VRCExpressionsMenu.Control.ControlType.RadialPuppet, mat.name + "MainHue");
+                    CreateMenuControl(menuMat, "Main Saturation", VRCExpressionsMenu.Control.ControlType.RadialPuppet, mat.name + "MainSat");
+                    CreateMenuControl(menuMat, "Main Brightness", VRCExpressionsMenu.Control.ControlType.RadialPuppet, mat.name + "MainBright");
 
                 }
-
+                if (aClipDecal0HueMax != null)
+                {
+                    var clip1 = SaveAnimation(aClipDecal0HueMin[i], savePath);
+                    var clip2 = SaveAnimation(aClipDecal0HueMax[i], savePath);
+                    CreateBlendTree(vrcAvatarDescriptor, mat.name + "Decal0 Hue", mat.name + "Decal0Hue", clip1, clip2);
+                    //CreateMenuControl(menuPoi, "Decal0 Settings", VRCExpressionsMenu.Control.ControlType.SubMenu, menuMat);
+                    CreateMenuControl(menuMat, "Decal0 Hue Color", VRCExpressionsMenu.Control.ControlType.RadialPuppet, mat.name + "Decal0Hue");
+                }
+                if (aClipDecal1HueMax != null)
+                {
+                    var clip1 = SaveAnimation(aClipDecal1HueMin[i], savePath);
+                    var clip2 = SaveAnimation(aClipDecal1HueMax[i], savePath);
+                    CreateBlendTree(vrcAvatarDescriptor, mat.name + "Decal1 Hue", mat.name + "Decal1Hue", clip1, clip2);
+                    CreateMenuControl(menuMat, "Decal1 Hue Color", VRCExpressionsMenu.Control.ControlType.RadialPuppet, mat.name + "Decal1Hue");
+                }
+                if (aClipDecal2HueMax != null)
+                {
+                    var clip1 = SaveAnimation(aClipDecal2HueMin[i], savePath);
+                    var clip2 = SaveAnimation(aClipDecal2HueMax[i], savePath);
+                    CreateBlendTree(vrcAvatarDescriptor, mat.name + "Decal2 Hue", mat.name + "Decal2Hue", clip1, clip2);
+                    CreateMenuControl(menuMat, "Decal2 Hue Color", VRCExpressionsMenu.Control.ControlType.RadialPuppet, mat.name + "Decal2Hue");
+                }
+                if (aClipDecal3HueMax != null)
+                {
+                    var clip1 = SaveAnimation(aClipDecal3HueMin[i], savePath);
+                    var clip2 = SaveAnimation(aClipDecal3HueMax[i], savePath);
+                    CreateBlendTree(vrcAvatarDescriptor, mat.name + "Decal3 Hue", mat.name + "Decal3Hue", clip1, clip2);
+                    CreateMenuControl(menuMat, "Decal3 Hue Color", VRCExpressionsMenu.Control.ControlType.RadialPuppet, mat.name + "Decal3Hue");
+                }
             }
         }
 
+        public static void CloneAndRegenerateGUIDs(string contextPath)
+        {
+            Dictionary<string, string> guidDictionary = new Dictionary<string, string>();
+            string clonedPath = contextPath + " 1";
+            string contextName = contextPath.Split('/')[1];
+            if (AssetDatabase.IsValidFolder(clonedPath))
+            {
+                Debug.LogError("Cloned Folder already exists!" + clonedPath);
+                return;
+            }
+            string[] assetPaths = Directory.GetFiles(contextPath, "*", SearchOption.AllDirectories)
+            .Where(path => !path.EndsWith(".meta")) //&& !path.EndsWith(".fbx") && !path.EndsWith(".wav"))
+            .ToArray();
+
+            foreach (string originalAssetPath in assetPaths)
+            {
+                string assetPath = originalAssetPath.Replace("\\", "/");
+                string relativePath = assetPath.Substring(contextPath.Length + 1);
+                string clonedAssetPath = Path.Combine(clonedPath, relativePath).Replace("\\", "/");
+                string directoryPath = Path.GetDirectoryName(clonedAssetPath);
+                Directory.CreateDirectory(directoryPath);
+                if (AssetDatabase.CopyAsset(assetPath, clonedAssetPath))
+                {
+                    guidDictionary[AssetDatabase.AssetPathToGUID(assetPath)] = AssetDatabase.AssetPathToGUID(clonedAssetPath);
+                }
+            }
+            AssetDatabase.Refresh();
+            string[] clonedAssetPaths = Directory.GetFiles(clonedPath, "*", SearchOption.AllDirectories)
+            .Where(path => !path.EndsWith(".meta")) //&& !path.EndsWith(".fbx") && !path.EndsWith(".wav"))
+            .ToArray();
+            foreach (string clonedAsset in clonedAssetPaths)
+            {
+                UpdateGuidsInFile(clonedAsset, guidDictionary);
+            }
+            AssetDatabase.Refresh();
+        }
+
+        public static void UpdateGuidsInFile(string path, Dictionary<string,string> guidDictionary)
+        {
+            if (!File.Exists(path) || String.IsNullOrEmpty(path))
+            {
+                Debug.LogError($"File at {path} does not exist or is NULL/EMPTY");
+                return;
+            }
+
+            string[] lines = File.ReadAllLines(path);
+
+            if (lines.Length > 0)
+            {
+                if (lines[0].Contains("%YAML"))
+                {
+                    for (int i = 1; i < lines.Length; i++)
+                    {
+                        foreach (var pair in guidDictionary)
+                        {
+                            if (lines[i].Contains(pair.Key))
+                            {
+                                // Replace the old GUID with the new one
+                                lines[i] = lines[i].Replace(pair.Key, pair.Value);
+                            }
+                        }
+                    }
+                    File.WriteAllLines(path, lines);
+                }
+            }            
+        }
     }
 }
