@@ -63,10 +63,13 @@ Gogo Loco:
 
 Scene:
 (Context - Usually "Assets/Avatar", labels the location that the buttons within Scene will influence)
+- Setup Menus/Params - Copy off the VRCSDK3 sample menu and params to the folder, attaches to the avatar
+- Setup FX Controller - Copy off the VRCSDK3 sample FX controller to the folder, attaches to the avatar
 - Regenerate GUIDs - Creates a new folder with a 1 "Avatar1" re-writing new GUIDs (CAUTION, few reference IDs might be missed and will need to manaully be repointed)
 - Cleanup - Reads every scene within context,  delete any leftover prefabs from this tool
 - Fix - Applies all fixes within "Common" to all scenes and avatars with vrc descriptor
 - Export - Exports everything in the context folder and Gogo Loco to a unitypackage file
+- Compile - Takes the Blender Zip path and the exported Unity Package, zips both into one file.
 
 # Credits
 Made by ShadsterWolf
