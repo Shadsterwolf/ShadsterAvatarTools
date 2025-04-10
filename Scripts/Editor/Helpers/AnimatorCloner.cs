@@ -1,4 +1,3 @@
-#if VRC_SDK_VRCSDK3
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -604,5 +603,3 @@ namespace Shadster.AvatarTools.VRLabs.AV3Manager //COPIED FROM VRLABS AV3MANAGER
         }
     }
 }
-
-#endif
