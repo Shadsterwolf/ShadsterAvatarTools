@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Experimental.XR.Interaction;
 using VRC.SDK3.Avatars.ScriptableObjects;
 
 namespace Shadster.AvatarTools
@@ -29,10 +30,15 @@ namespace Shadster.AvatarTools
 
         public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType)
         {
-            CreateVrcParameter(vrcParameters, paramName, vrcExType, 0, true); //minimum defaults
+            CreateVrcParameter(vrcParameters, paramName, vrcExType, 0, true, true); //minimum defaults
         }
 
         public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType, float defaultValue, bool saved)
+        {
+            CreateVrcParameter(vrcParameters, paramName, vrcExType, defaultValue, saved, true); //deafult & saved, but no sync value (before 3.8.0)
+        }
+
+        public static void CreateVrcParameter(VRCExpressionParameters vrcParameters, string paramName, VRCExpressionParameters.ValueType vrcExType, float defaultValue, bool saved, bool synced)
         {
 
             var vrcExParams = vrcParameters.parameters.ToList();
@@ -49,7 +55,8 @@ namespace Shadster.AvatarTools
                 name = paramName,
                 valueType = vrcExType,
                 defaultValue = defaultValue,
-                saved = saved
+                saved = saved,
+                networkSynced = synced
             };
             //Debug.Log(newVrcExParam.name + ", default value: " + newVrcExParam.defaultValue);
             vrcExParams.Add(newVrcExParam);

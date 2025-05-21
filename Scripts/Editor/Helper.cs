@@ -249,5 +249,28 @@ namespace Shadster.AvatarTools
             currentPath = currentPath.Replace("\\", "/"); //I am suffering
             return currentPath;
         }
+
+        public static List<GameObject> GetRenderersInChildren(GameObject parent)
+        {
+            if (parent == null) return null;
+
+            var result = new List<GameObject>();
+            var renderers = parent.GetComponentsInChildren<Renderer>(true);
+
+            foreach (var renderer in renderers)
+            {
+                result.Add(renderer.gameObject);
+                Debug.Log("GetRenderersInChildren: " + renderer.gameObject.name);
+            }
+            return result;
+        }
+
+        public static string RemoveQuotes(string input)
+        {
+            return input.Replace("\"", "").Replace("'", "");
+        }
+
     }
+
 }
+

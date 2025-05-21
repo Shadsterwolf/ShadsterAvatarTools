@@ -176,24 +176,27 @@ namespace Shadster.AvatarTools
             {
 
                 var path = AnimationUtility.CalculateTransformPath(pbone.transform, vrcAvatar.transform);
-                aClipCollisonOff.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
-                aClipCollisonOn.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
-                aClipCollisionOthers.SetCurve(path, typeof(GameObject), "m_IsActive", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
+                aClipCollisonOff.SetCurve(path, typeof(VRC_PhysBone), "m_Enabled", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
+                aClipCollisonOn.SetCurve(path, typeof(VRC_PhysBone), "m_Enabled", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
+                //aClipCollisionOthers.SetCurve(path, typeof(VRC_PhysBone), "m_Enabled", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
 
-                aClipCollisonOff.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 0)));
-                aClipCollisonOn.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 1), new Keyframe(0.1f, 1)));
-                aClipCollisionOthers.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 2), new Keyframe(0.1f, 2)));
+                aClipCollisonOff.SetCurve(path, typeof(VRC_PhysBone), "collisionFilter.allowSelf", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 0)));
+                aClipCollisonOn.SetCurve(path, typeof(VRC_PhysBone), "collisionFilter.allowSelf", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 1)));
 
-                aClipCollisonOn.name = "Physbone Collision ON";
-                aClipCollisonOff.name = "Physbone Collision OFF";
-                aClipCollisionOthers.name = "Physbone Collision Self OFF";
+                //aClipCollisonOff.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 0), new Keyframe(0.1f, 0)));
+                //aClipCollisonOn.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 1), new Keyframe(0.1f, 1)));
+                //aClipCollisionOthers.SetCurve(path, typeof(VRC_PhysBone), "allowCollision", new AnimationCurve(new Keyframe(0, 2), new Keyframe(0.1f, 2)));
+
+                aClipCollisonOn.name = "Physbone Collision Self ON";
+                aClipCollisonOff.name = "Physbone Collision Self OFF";
+                //aClipCollisionOthers.name = "Physbone Collision Self OFF";
 
             }
             //SaveAnimation(aClipOn, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
             //SaveAnimation(aClipOff, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
             var clip1 = SaveAnimation(aClipCollisonOn, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
-            SaveAnimation(aClipCollisonOff, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
-            var clip2 = SaveAnimation(aClipCollisionOthers, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
+            var clip2 = SaveAnimation(aClipCollisonOff, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
+            //var clip2 = SaveAnimation(aClipCollisionOthers, GetCurrentSceneRootPath() + "/Animations/Generated/Physbones");
             string paramName = "PhysCollision";
             CreateToggleLayer(vrcAvatarDescriptor, "PhysCollision Settings", paramName, clip2, clip1);
             //CreateFxParameter(vrcAvatarDescriptor, "PhysCollision", AnimatorControllerParameterType.Bool);
@@ -251,43 +254,77 @@ namespace Shadster.AvatarTools
 
         public static void CombineEmoteShapekeys(GameObject vrcAvatar)
         {
-
-            List<int> blendIndex = new List<int>();
+            // Create data structure to hold all emote blendshapes across all SMRs
+            Dictionary<string, List<(string path, SkinnedMeshRenderer smr, int index)>> emoteBlendshapes =
+                new Dictionary<string, List<(string path, SkinnedMeshRenderer smr, int index)>>();
             foreach (var smr in vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 string blendPath = AnimationUtility.CalculateTransformPath(smr.transform, vrcAvatar.transform);
+
                 for (int i = 0; i < smr.sharedMesh.blendShapeCount; i++)
                 {
-                    if (smr.sharedMesh.GetBlendShapeName(i).Contains("Emote"))
-                    {
-                        blendIndex.Add(i);
-                    }
-                }
-                if (blendIndex.Count > 0)
-                {
-                    //Debug.Log("SMR NAME: " + smr.name);
-                    //Debug.Log("INDEX COUNT: " + blendIndex.Count);
-                    AnimationClip emoteIdle = new AnimationClip();
-                    emoteIdle.name = "Emote_Idle";
-                    for (int i = 0; i < blendIndex.Count; i++)
-                    {
-                        AnimationClip emoteClip = new AnimationClip();
-                        emoteClip.name = smr.sharedMesh.GetBlendShapeName(blendIndex[i]);
-                        emoteClip.SetCurve(blendPath, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(blendIndex[i]), new AnimationCurve(new Keyframe(0, 100)));
-                        emoteIdle.SetCurve(blendPath, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(blendIndex[i]), new AnimationCurve(new Keyframe(0, 0)));
-                        for (int j = 0; j < blendIndex.Count; j++)
-                        {
-                            if (blendIndex[i] != blendIndex[j])
-                            {
-                                emoteClip.SetCurve(blendPath, typeof(SkinnedMeshRenderer), "blendShape." + smr.sharedMesh.GetBlendShapeName(blendIndex[j]), new AnimationCurve(new Keyframe(0, 0)));
-                            }
+                    string blendShapeName = smr.sharedMesh.GetBlendShapeName(i);
 
+                    if (blendShapeName.Contains("Emote"))
+                    {
+                        // Add this blendshape to our collection
+                        if (!emoteBlendshapes.ContainsKey(blendShapeName))
+                        {
+                            emoteBlendshapes[blendShapeName] = new List<(string, SkinnedMeshRenderer, int)>();
                         }
-                        SaveAnimation(emoteClip, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes");
+
+                        emoteBlendshapes[blendShapeName].Add((blendPath, smr, i));
                     }
-                    SaveAnimation(emoteIdle, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes");
-                    blendIndex.Clear();
                 }
+            }
+            if (emoteBlendshapes.Count > 0)
+            {
+                AnimationClip emoteIdle = new AnimationClip();
+                emoteIdle.name = "Emote_Idle";
+                foreach (var entry in emoteBlendshapes)
+                {
+                    foreach (var blendData in entry.Value)
+                    {
+                        emoteIdle.SetCurve(
+                            blendData.path,
+                            typeof(SkinnedMeshRenderer),
+                            "blendShape." + entry.Key,
+                            new AnimationCurve(new Keyframe(0, 0))
+                        );
+                    }
+                }
+                foreach (var emoteEntry in emoteBlendshapes)
+                {
+                    string emoteName = emoteEntry.Key;
+                    AnimationClip emoteClip = new AnimationClip();
+                    emoteClip.name = emoteName;
+                    foreach (var blendData in emoteEntry.Value) // Set this emote to 100 in all places it appears
+                    {
+                        emoteClip.SetCurve(
+                            blendData.path,
+                            typeof(SkinnedMeshRenderer),
+                            "blendShape." + emoteName,
+                            new AnimationCurve(new Keyframe(0, 100))
+                        );
+                    }
+                    foreach (var otherEntry in emoteBlendshapes) // Set all other emotes to 0
+                    {
+                        if (otherEntry.Key != emoteName)
+                        {
+                            foreach (var blendData in otherEntry.Value)
+                            {
+                                emoteClip.SetCurve(
+                                    blendData.path,
+                                    typeof(SkinnedMeshRenderer),
+                                    "blendShape." + otherEntry.Key,
+                                    new AnimationCurve(new Keyframe(0, 0))
+                                );
+                            }
+                        }
+                    }
+                    SaveAnimation(emoteClip, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes");
+                }
+                SaveAnimation(emoteIdle, GetCurrentSceneRootPath() + "/Animations/Generated/ShapeKeys/Emotes");
             }
         }
 

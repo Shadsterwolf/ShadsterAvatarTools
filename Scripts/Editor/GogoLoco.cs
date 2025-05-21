@@ -10,6 +10,9 @@ using static Shadster.AvatarTools.Params;
 using static Shadster.AvatarTools.Menus;
 using UnityEditor.Animations;
 using Shadster.AvatarTools.VRLabs.AV3Manager;
+using VRC.SDK3.Dynamics.Constraint.Components;
+using VRC.Dynamics;
+using System.IO;
 
 namespace Shadster.AvatarTools
 {
@@ -21,6 +24,25 @@ namespace Shadster.AvatarTools
             {
                 return true;
             }
+            return false;
+        }
+
+        public static bool GetGogoLocoVersion(string version)
+        {
+            string path = "Assets/GoGo/GoLoco/README!.txt";
+            if (File.Exists(path))
+            {
+                foreach (string line in File.ReadLines(path))
+                {
+                    if (line.Contains(version))
+                    {
+                        Debug.Log("Version 1.8.6 found in README!");
+                        return true;
+                    }
+                }
+            }
+            Debug.Log("Gogo Version " + version + " not found.");
+
             return false;
         }
 
@@ -76,17 +98,21 @@ namespace Shadster.AvatarTools
                 Transform flyRotation = ob.transform.Find("Fly/Rotation");
                 if (flyRotation != null)
                 {
-                    RotationConstraint constraint = flyRotation.GetComponent<RotationConstraint>();
+                    VRCRotationConstraint constraint = flyRotation.GetComponent<VRCRotationConstraint>();
+                    //RotationConstraint constraint = flyRotation.GetComponent<RotationConstraint>();
                     if (constraint != null)
                     {
                         Transform head = vrcAvatar.transform.Find("Armature/Hips/Spine/Chest/Neck/Head");
                         if (head != null)
                         {
-                            ConstraintSource source = new ConstraintSource();
-                            source.sourceTransform = head;
-                            source.weight = 1.0f;
-
-                            constraint.SetSource(0, source);
+                            //ConstraintSource source = new ConstraintSource();
+                            //source.sourceTransform = head;
+                            //source.weight = 1.0f;
+                            //constraint.SetSource(0, source);
+                            VRCConstraintSource source = new VRCConstraintSource();
+                            source.SourceTransform = head;
+                            source.Weight = 1.0f;
+                            constraint.Sources[0] = source;
                         }
                         else { Debug.LogError("Head not found in the hierarchy."); }
                     }
@@ -112,26 +138,34 @@ namespace Shadster.AvatarTools
             DeleteVrcParameter(vrcParameters, "Go/Horizon");
             DeleteVrcParameter(vrcParameters, "Go/ThirdPerson");
             DeleteVrcParameter(vrcParameters, "Go/ThirdPersonMirror");
-            CreateVrcParameter(vrcParameters, "VRCEmote", VRCExpressionParameters.ValueType.Int, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/Float", VRCExpressionParameters.ValueType.Float, 0f, true);
-            CreateVrcParameter(vrcParameters, "Go/PoseRadial", VRCExpressionParameters.ValueType.Float, 0f, false);
-            CreateVrcParameter(vrcParameters, "Go/Stationary", VRCExpressionParameters.ValueType.Bool, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/Locomotion", VRCExpressionParameters.ValueType.Bool, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/Jump&Fall", VRCExpressionParameters.ValueType.Bool, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/StandIdle", VRCExpressionParameters.ValueType.Int, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/CrouchIdle", VRCExpressionParameters.ValueType.Int, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/ProneIdle", VRCExpressionParameters.ValueType.Int, 0, true);
-            CreateVrcParameter(vrcParameters, "Go/Swimming", VRCExpressionParameters.ValueType.Bool, 0, false);
-            CreateVrcParameter(vrcParameters, "Go/PuppetX", VRCExpressionParameters.ValueType.Float, 0f, false);
-            CreateVrcParameter(vrcParameters, "Go/PuppetY", VRCExpressionParameters.ValueType.Float, 0f, false);
-            CreateVrcParameter(vrcParameters, "Go/Height", VRCExpressionParameters.ValueType.Float, 0f, true);
+            CreateVrcParameter(vrcParameters, "VRCEmote", VRCExpressionParameters.ValueType.Int, 0, false, true);
+            CreateVrcParameter(vrcParameters, "Go/Float", VRCExpressionParameters.ValueType.Float, 0, false, true);
+            CreateVrcParameter(vrcParameters, "Go/PoseRadial", VRCExpressionParameters.ValueType.Float, 0, false, false);
+            CreateVrcParameter(vrcParameters, "Go/Stationary", VRCExpressionParameters.ValueType.Bool, 0, false, false);
+            CreateVrcParameter(vrcParameters, "Go/Locomotion", VRCExpressionParameters.ValueType.Bool, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/Jump&Fall", VRCExpressionParameters.ValueType.Bool, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/StandIdle", VRCExpressionParameters.ValueType.Int, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/StandType", VRCExpressionParameters.ValueType.Int, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/CrouchIdle", VRCExpressionParameters.ValueType.Int, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/ProneIdle", VRCExpressionParameters.ValueType.Int, 2, true, false);
+            CreateVrcParameter(vrcParameters, "Go/Swimming", VRCExpressionParameters.ValueType.Bool, 0, false, false);
+            CreateVrcParameter(vrcParameters, "Go/PuppetX", VRCExpressionParameters.ValueType.Float, 0, false, false);
+            CreateVrcParameter(vrcParameters, "Go/PuppetY", VRCExpressionParameters.ValueType.Float, 0, false, false);
+            CreateVrcParameter(vrcParameters, "Go/Height", VRCExpressionParameters.ValueType.Float, 0, false, false);
+            CreateVrcParameter(vrcParameters, "Go/StandIdleMirror", VRCExpressionParameters.ValueType.Bool, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/CrouchIdleMirror", VRCExpressionParameters.ValueType.Bool, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/ProneIdleMirror", VRCExpressionParameters.ValueType.Bool, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/Dash", VRCExpressionParameters.ValueType.Bool, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/DashDistance", VRCExpressionParameters.ValueType.Float, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/Dash/Right/FistWeight", VRCExpressionParameters.ValueType.Bool, 0, true, false);
+            CreateVrcParameter(vrcParameters, "Go/Station/Chair", VRCExpressionParameters.ValueType.Bool, 0, false, true);
         }
 
         public static void SetupGogoBeyondFX(VRCAvatarDescriptor vrcAvatarDescriptor)
         {
             var fx = GetFxController(vrcAvatarDescriptor);
+            DeleteOldGogoFXLayers(fx);
             AnimatorController gogoController = AssetDatabase.LoadAssetAtPath<AnimatorController>("Assets/GoGo/GoLoco/Controllers/GoLocoFXBeyond.controller");
-
             CopyControllerParams(gogoController, fx);
             VRLabs.AV3Manager.AnimatorCloner.CopyControllerLayer(gogoController, 1, fx);
             VRLabs.AV3Manager.AnimatorCloner.CopyControllerLayer(gogoController, 2, fx);
@@ -150,6 +184,14 @@ namespace Shadster.AvatarTools
             var subMenu = (VRCExpressionsMenu)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/MainMenu/Menu/GoBeyondMenu.asset", typeof(VRCExpressionsMenu));
             var icon = (Texture2D)AssetDatabase.LoadAssetAtPath("Assets/GoGo/GoLoco/Icons/icon_Go_Loco.png", typeof(Texture2D));
             CreateMenuControl(vrcMenu, "GoGo Loco Menu", VRCExpressionsMenu.Control.ControlType.SubMenu, "", subMenu, icon);
+        }
+
+        public static void DeleteOldGogoFXLayers(AnimatorController fx)
+        {
+            DeleteExistingFxLayer(fx, "Flying");
+            DeleteExistingFxLayer(fx, "Flying Scale");
+            DeleteExistingFxLayer(fx, "Scale");
+            DeleteExistingFxLayer(fx, "ThirdPerson"); 
         }
     }
 }
